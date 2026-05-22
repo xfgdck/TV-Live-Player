@@ -1,0 +1,6 @@
+{
+  "name": "TV Live Player",
+  "description": "A cross-platform (TV & Mobile) live TV player supporting customizable M3U/M3U8 playlists, keyboard/remote controls, and responsive styling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

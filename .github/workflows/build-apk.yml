@@ -1,0 +1,80 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  build:
+    name: Build React Web App & Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Assets (SPA)
+        run: npm run build
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Initialize & Sync Capacitor Android
+        run: |
+          # If capacitor config exists but android directory doesn't, add it
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          # Sync the built static assets from dist/ to the android platform project
+          npx cap sync android
+
+      - name: Make Gradlew Executable
+        run: chmod +x android/gradlew
+
+      - name: Compile and Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Locate & Rename APK
+        run: |
+          # Find the generated APK and move/rename it for clean artifact name
+          mkdir -p build-output
+          APK_PATH=$(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          if [ -f "$APK_PATH" ]; then
+            cp "$APK_PATH" build-output/tv-live-player-debug.apk
+            echo "Successfully built and copied APK to build-output/"
+          else
+            echo "APK build file not found!"
+            exit 1
+          fi
+
+      - name: Upload Build Artifact (APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-live-player-apk
+          path: build-output/tv-live-player-debug.apk
+          if-no-files-found: error
+          retention-days: 14
