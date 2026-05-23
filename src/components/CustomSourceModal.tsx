@@ -14,6 +14,7 @@ import {
   Shuffle, 
   Play 
 } from "lucide-react";
+import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { DEFAULT_PLAYLIST_SOURCES } from "../data/defaultChannels";
 import { CustomSource, TVChannel } from "../types";
 import { parseM3uPlaylist } from "../utils/m3uParser";
@@ -70,35 +71,54 @@ export default function CustomSourceModal({
 
     try {
       let m3uText = "";
-      console.log(`[Client-M3u] Fetching directly: ${targetUrl}`);
       
-      try {
-        const res = await fetch(targetUrl, { signal: AbortSignal.timeout(10000) });
-        if (res.ok) {
-          m3uText = await res.text();
+      // If we are running inside native app WebView, use Native HTTP (completely immune to CORS)
+      if (Capacitor.isNativePlatform()) {
+        console.log(`[Native-M3u] Fetching via CapacitorHttp: ${targetUrl}`);
+        const response = await CapacitorHttp.get({ 
+          url: targetUrl,
+          connectTimeout: 10000,
+          readTimeout: 15000
+        });
+        
+        if (response.status === 200) {
+          m3uText = typeof response.data === "string" 
+            ? response.data 
+            : JSON.stringify(response.data);
         } else {
-          throw new Error(`HTTP ${res.status}`);
+          throw new Error(`获取订阅源失败 (HTTP ${response.status})，请检查链接地址是否正确。`);
         }
-      } catch (directErr) {
-        console.warn("[Client-M3u] Direct fetch failed (CORS or network error). Trying public CORS proxy...", directErr);
-        // Fallback to AllOrigins public CORS proxy
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
-        if (res.ok) {
-          m3uText = await res.text();
-        } else {
-          throw new Error("直接访问与云端跨域代理获取该订阅源均失败。可能是该源服务器已离线，或存在安全拦截。");
+      } else {
+        // Fallback for browser / development
+        console.log(`[Browser-M3u] Fetching directly: ${targetUrl}`);
+        try {
+          const res = await fetch(targetUrl, { signal: AbortSignal.timeout(10000) });
+          if (res.ok) {
+            m3uText = await res.text();
+          } else {
+            throw new Error(`HTTP ${res.status}`);
+          }
+        } catch (directErr) {
+          console.warn("[Browser-M3u] Direct fetch failed. Trying CORS proxy...", directErr);
+          // Fallback to AllOrigins public CORS proxy
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
+          if (res.ok) {
+            m3uText = await res.text();
+          } else {
+            throw new Error("获取该订阅源失败。可能是该源链接已失效，或者服务器防盗链拦截。");
+          }
         }
       }
 
-      if (!m3uText.trim()) {
+      if (!m3uText || !m3uText.trim()) {
         throw new Error("获取到的播放源内容为空，请检查链接可用性");
       }
 
       const parsedChannels = parseM3uPlaylist(m3uText);
 
       if (!parsedChannels || parsedChannels.length === 0) {
-        throw new Error("解析完毕，但没有在该 M3U 文件中找到有效的频道（视频流需以 http/https/rtmp/rtsp 开头，且上行包含 #EXTINF 元数据）");
+        throw new Error("解析完毕，但未在该 M3U 文件中找到有效的频道（链接需以 http/https 开头，并包含 #EXTINF 信息）");
       }
 
       // Add actual channels
@@ -110,7 +130,7 @@ export default function CustomSourceModal({
       }
     } catch (err: any) {
       console.error(err);
-      setParseError(err.message || "解析此订阅源时发生未知网络错误。您可以尝试‘手动上传 M3U 文件’或‘直接粘贴文本’导入。");
+      setParseError(err.message || "解析此订阅源时发生网络请求错误。您可以尝试‘导入本地文件’或‘直接粘贴文本’。");
     } finally {
       setIsParsing(false);
     }
@@ -319,9 +339,9 @@ export default function CustomSourceModal({
               <div className="space-y-6">
                 {/* Mode A: URL */}
                 <div className="space-y-3 bg-neutral-950/50 p-4 rounded-2xl border border-white/5">
-                  <span className="text-xs uppercase font-extrabold text-amber-500 tracking-wider">模式一：在线订阅链接 (自动绕跨域)</span>
+                  <span className="text-xs uppercase font-extrabold text-amber-500 tracking-wider">方法一：在线订阅链接</span>
                   <p className="text-neutral-400 text-xs leading-relaxed">
-                    输入公网 M3U 播放列表链接，系统将直接获取。若遇到主链接 CORS 拦截，将自动启用公网 CORS 路由。
+                    输入公网 M3U 订阅源链接，即可在线解析并导入最新的电视频道列表。
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-1">
@@ -355,12 +375,12 @@ export default function CustomSourceModal({
                     {isParsing ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        正在下载获取并本地解析频道列表中，请稍候...
+                        正在下载并本地解析频道列表中，请稍候...
                       </>
                     ) : (
                       <>
                         <Download className="w-3.5 h-3.5" />
-                        下载获取并导入在线 M3U 源
+                        一键下载并导入在线订阅源
                       </>
                     )}
                   </button>
@@ -372,9 +392,9 @@ export default function CustomSourceModal({
                   {/* Mode B: Local M3U File */}
                   <div className="space-y-3 bg-neutral-950/50 p-4 rounded-2xl border border-white/5 flex flex-col justify-between">
                     <div>
-                      <span className="text-xs uppercase font-extrabold text-amber-500 tracking-wider block mb-1">模式二：本地 M3U 文件导入</span>
+                      <span className="text-xs uppercase font-extrabold text-amber-500 tracking-wider block mb-1">方法二：本地 M3U 文件导入</span>
                       <p className="text-neutral-400 text-[11px] leading-relaxed mb-3">
-                        将下载好的 <strong>.m3u / .m3u8</strong> 播放源文件直接拖入或选择，在本地客户端沙箱内直接解析，免除任何跨域问题，支持 100% 离线使用！
+                        选择您的手机、电脑或电视本地存储的 <strong>.m3u / .m3u8</strong> 直播源文件，支持完全离线导入使用。
                       </p>
                     </div>
                     
@@ -391,14 +411,14 @@ export default function CustomSourceModal({
                         className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 font-bold border border-neutral-700 shadow text-center"
                       >
                         <Upload className="w-3.5 h-3.5 mr-1" />
-                        选择本地 M3U 播放源文件
+                        选择本地直播源文件
                       </label>
                     </div>
                   </div>
 
                   {/* Mode C: Raw Text Paste */}
                   <div className="space-y-3 bg-neutral-950/50 p-4 rounded-2xl border border-white/5">
-                    <span className="text-xs uppercase font-extrabold text-amber-500 tracking-wider">模式三：直接粘贴 M3U 文本</span>
+                    <span className="text-xs uppercase font-extrabold text-amber-500 tracking-wider">方法三：直接粘贴 M3U 文本</span>
                     <input
                       id="input_pasted_m3u_name"
                       type="text"
@@ -422,7 +442,7 @@ export default function CustomSourceModal({
                       className="w-full py-2 bg-neutral-800 hover:bg-neutral-750 text-white border border-neutral-700 hover:border-neutral-600 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 font-bold cursor-pointer"
                     >
                       <FileInput className="w-3.5 h-3.5" />
-                      解析并导入所贴文本
+                      直接解析导入所贴文本
                     </button>
                   </div>
 
