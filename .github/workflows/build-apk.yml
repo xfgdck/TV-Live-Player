@@ -47,6 +47,14 @@ jobs:
           if [ ! -d "android" ]; then
             npx cap add android
           fi
+          # Ensure Android 6 compatibility: lower target SDK to avoid new runtime behaviors
+          # Patch variables.gradle
+          if [ -f android/variables.gradle ]; then
+            sed -i 's/targetSdkVersion = .*/targetSdkVersion = 23/' android/variables.gradle
+            sed -i 's/minSdkVersion = .*/minSdkVersion = 22/' android/variables.gradle
+            echo "Patched variables.gradle for Android 6 compatibility:"
+            cat android/variables.gradle
+          fi
           # Sync the built static assets from dist/ to the android platform project
           npx cap sync android
 

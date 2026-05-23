@@ -3,6 +3,12 @@
   "appName": "TV Live Player",
   "webDir": "dist",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "http",
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": false,
+    "minWebViewVersion": 44
   }
 }
