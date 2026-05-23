@@ -10,7 +10,9 @@ import {
   Trash2, 
   X,
   Radio,
-  FileCheck
+  FileCheck,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 
 import { TVChannel, CustomSource } from "./types";
@@ -43,6 +45,12 @@ export default function App() {
   // Modals / Overlays
   const [isSourceModalOpen, setIsSourceModalOpen] = useState<boolean>(false);
   const [isRemoteWidgetOpen, setIsRemoteWidgetOpen] = useState<boolean>(false);
+
+  // Drag and Drop Reorder State (TV-adapted: move buttons + keyboard shortcuts)
+  const [lastMovedChannelId, setLastMovedChannelId] = useState<string | null>(null);
+
+  // Helper: check if a channel is custom (not built-in)
+  const isCustomChannel = (channelId: string) => !INITIAL_DEFAULT_CHANNELS.some(d => d.id === channelId);
 
   // Load state from LocalStorage on mount
   useEffect(() => {
@@ -254,6 +262,71 @@ export default function App() {
     }
   };
 
+  // Delete a single custom channel
+  const handleDeleteChannel = (channelId: string) => {
+    if (!isCustomChannel(channelId)) return;
+
+    const channelToDelete = channels.find(c => c.id === channelId);
+    if (!channelToDelete) return;
+
+    if (!window.confirm(`确定要删除频道「${channelToDelete.name}」吗？`)) return;
+
+    const currentCustomChannels = channels.filter(c => isCustomChannel(c.id));
+    const nextCustomChannels = currentCustomChannels.filter(c => c.id !== channelId);
+
+    saveCustomChannelsToLocalStorage(nextCustomChannels);
+
+    const combined = [...INITIAL_DEFAULT_CHANNELS, ...nextCustomChannels];
+    setChannels(combined);
+
+    // Reset selection if deleted channel was selected
+    if (selectedChannel?.id === channelId) {
+      setSelectedChannel(combined[0] || null);
+    }
+
+    // Also remove from favorites
+    if (favorites.includes(channelId)) {
+      const nextFavs = favorites.filter(id => id !== channelId);
+      setFavorites(nextFavs);
+      localStorage.setItem("tv_favorites", JSON.stringify(nextFavs));
+    }
+  };
+
+  // ----- TV-friendly Reorder: Move focused channel up/down -----
+  const handleMoveFocusedChannel = (direction: "up" | "down") => {
+    if (focusedArea !== "channels") return;
+
+    const focusedChannel = filteredChannels[focusedChannelIdx];
+    if (!focusedChannel || !isCustomChannel(focusedChannel.id)) return;
+
+    const currentCustomChannels = channels.filter(c => isCustomChannel(c.id));
+    const customIdx = currentCustomChannels.findIndex(c => c.id === focusedChannel.id);
+    if (customIdx === -1) return;
+
+    const targetIdx = direction === "up" ? customIdx - 1 : customIdx + 1;
+    if (targetIdx < 0 || targetIdx >= currentCustomChannels.length) return;
+
+    const reordered = [...currentCustomChannels];
+    [reordered[customIdx], reordered[targetIdx]] = [reordered[targetIdx], reordered[customIdx]];
+
+    saveCustomChannelsToLocalStorage(reordered);
+
+    const combined = [...INITIAL_DEFAULT_CHANNELS, ...reordered];
+    setChannels(combined);
+    setLastMovedChannelId(focusedChannel.id);
+  };
+
+  // Track moved channel and update focus index after reorder
+  useEffect(() => {
+    if (lastMovedChannelId) {
+      const idx = filteredChannels.findIndex(c => c.id === lastMovedChannelId);
+      if (idx !== -1) {
+        setFocusedChannelIdx(idx);
+      }
+      setLastMovedChannelId(null);
+    }
+  }, [filteredChannels, lastMovedChannelId]);
+
   // State file backup Export / Import triggers
   const handleExportState = () => {
     const backupData = {
@@ -365,6 +438,24 @@ export default function App() {
       const isLg = window.innerWidth >= 1024;
       const totalLen = filteredChannels.length;
 
+      // Ctrl+ArrowUp/Down = Move channel order (TV-friendly reorder)
+      if (actionKey === "CtrlArrowUp") {
+        handleMoveFocusedChannel("up");
+        return;
+      }
+      if (actionKey === "CtrlArrowDown") {
+        handleMoveFocusedChannel("down");
+        return;
+      }
+      // Delete key or D key = Delete focused custom channel
+      if (actionKey === "DeleteChannel") {
+        const focused = filteredChannels[focusedChannelIdx];
+        if (focused && isCustomChannel(focused.id)) {
+          handleDeleteChannel(focused.id);
+        }
+        return;
+      }
+
       if (actionKey === "ArrowUp") {
         setFocusedChannelIdx((prev) => (prev > 0 ? prev - 1 : prev));
       } else if (actionKey === "ArrowDown") {
@@ -398,10 +489,18 @@ export default function App() {
 
       switch (e.key) {
         case "ArrowUp":
-          executeRemoteAction("ArrowUp");
+          if (e.ctrlKey || e.metaKey) {
+            executeRemoteAction("CtrlArrowUp");
+          } else {
+            executeRemoteAction("ArrowUp");
+          }
           break;
         case "ArrowDown":
-          executeRemoteAction("ArrowDown");
+          if (e.ctrlKey || e.metaKey) {
+            executeRemoteAction("CtrlArrowDown");
+          } else {
+            executeRemoteAction("ArrowDown");
+          }
           break;
         case "ArrowLeft":
           executeRemoteAction("ArrowLeft");
@@ -416,6 +515,9 @@ export default function App() {
         case "Backspace":
         case "Escape":
           executeRemoteAction("Backspace");
+          break;
+        case "Delete":
+          executeRemoteAction("DeleteChannel");
           break;
         default:
           break;
@@ -670,17 +772,27 @@ export default function App() {
                   filteredChannels.map((chan, idx) => {
                     const isPlaying = selectedChannel?.id === chan.id;
                     const isFocused = focusedArea === "channels" && focusedChannelIdx === idx;
+                    const isCustom = isCustomChannel(chan.id);
+                    const showActions = isFocused && isCustom;
+                    
+                    // Compute whether this specific channel can move up/down
+                    const customList = channels.filter(c => isCustomChannel(c.id));
+                    const thisCustomIdx = isCustom ? customList.findIndex(c => c.id === chan.id) : -1;
+                    const canUp = isCustom && thisCustomIdx > 0;
+                    const canDown = isCustom && thisCustomIdx >= 0 && thisCustomIdx < customList.length - 1;
 
                     return (
                       <div
                         key={chan.id}
                         id={`tv_channel_item_${idx}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest("button")) return;
                           setSelectedChannel(chan);
                           setFocusedArea("channels");
                           setFocusedChannelIdx(idx);
                         }}
-                        className={`p-3 rounded-2xl flex items-center justify-between cursor-pointer transition-all border ${
+                        className={`group p-3 rounded-2xl flex items-center gap-2 justify-between cursor-pointer transition-all border ${
                           isPlaying
                             ? "bg-gradient-to-r from-amber-600/15 via-[#1a1a1f] to-neutral-900 border-amber-500/30"
                             : "bg-[#0c0c0f] border-white/5 hover:bg-neutral-800/20 hover:border-neutral-800"
@@ -690,10 +802,13 @@ export default function App() {
                             : ""
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="text-[10px] text-neutral-500 font-mono w-4 text-right">
-                            {idx + 1}
-                          </span>
+                        {/* Channel info area */}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {!isCustom && (
+                            <span className="text-[10px] text-neutral-500 font-mono w-4 text-right shrink-0">
+                              {idx + 1}
+                            </span>
+                          )}
                           {chan.logo ? (
                             <img
                               src={chan.logo}
@@ -720,12 +835,69 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          {isPlaying && (
+                        {/* Action buttons area */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          
+                          {/* TV-friendly action buttons: visible when focused */}
+                          {showActions && (
+                            <div className="flex items-center gap-0.5 mr-1 animate-fade-in">
+                              {/* Move Up */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (canUp) handleMoveFocusedChannel("up");
+                                }}
+                                disabled={!canUp}
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  canUp
+                                    ? "text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+                                    : "text-neutral-700 cursor-not-allowed"
+                                }`}
+                                title="上移 (Ctrl+↑)"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              {/* Move Down */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (canDown) handleMoveFocusedChannel("down");
+                                }}
+                                disabled={!canDown}
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  canDown
+                                    ? "text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+                                    : "text-neutral-700 cursor-not-allowed"
+                                }`}
+                                title="下移 (Ctrl+↓)"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                              {/* Delete */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteChannel(chan.id);
+                                }}
+                                className="p-1.5 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-lg transition-all ml-0.5 border-l border-neutral-700 pl-1.5"
+                                title="删除频道 (Delete)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+
+                          {isPlaying && !showActions && (
                             <span className="text-[9px] font-bold tracking-wider text-amber-500 animate-pulse bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-sans uppercase">
                               Playing
                             </span>
                           )}
+                          {isPlaying && showActions && (
+                            <span className="text-[9px] font-bold tracking-wider text-amber-500 animate-pulse bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full font-sans uppercase">
+                              ON
+                            </span>
+                          )}
+
                           <button
                             id={`btn_channel_fav_${chan.id}`}
                             onClick={(e) => {
@@ -746,21 +918,27 @@ export default function App() {
             </div>
 
             {/* Keyboard / D-pad Navigation Indicator Bar */}
-            <div className="bg-[#0c0c0f]/80 p-3 border border-white/5 rounded-2xl flex justify-between items-center text-[9px] text-neutral-500 font-mono">
-              <span className="flex items-center gap-1">
+            <div className="bg-[#0c0c0f]/80 p-3 border border-white/5 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-2 text-[9px] text-neutral-500 font-mono">
+              <div className="flex items-center gap-1">
+                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">↑↓</span>
+                <span>选择 Select</span>
+                <span className="text-neutral-700">|</span>
                 <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">←</span>
                 <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">→</span>
-                键切换分栏 Focus
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">↑</span>
-                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">↓</span>
-                选择电视频道 Select
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">Enter</span>
-                播放 Play
-              </span>
+                <span>分栏 Tab</span>
+                <span className="text-neutral-700">|</span>
+                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5 font-bold text-amber-500">Enter</span>
+                <span>播放</span>
+              </div>
+              <div className="flex items-center gap-1 text-[9px]">
+                <span className="px-1.5 py-0.5 bg-amber-500/10 rounded border border-amber-500/20 text-amber-400">Ctrl</span>
+                <span>+</span>
+                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-white/5">↑↓</span>
+                <span>排序</span>
+                <span className="text-neutral-700">|</span>
+                <span className="px-1.5 py-0.5 bg-neutral-900 rounded border border-red-500/30 text-red-400">Del</span>
+                <span>删除</span>
+              </div>
             </div>
 
           </div>

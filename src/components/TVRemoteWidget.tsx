@@ -9,7 +9,10 @@ import {
   Tv, 
   Volume2, 
   VolumeX,
-  X 
+  X,
+  ArrowUp,
+  ArrowDown,
+  Trash2
 } from "lucide-react";
 
 interface TVRemoteWidgetProps {
@@ -132,11 +135,39 @@ export default function TVRemoteWidget({
 
       </div>
 
+      {/* Channel management actions (TV-friendly) */}
+      <div className="mt-3 flex gap-2 w-full justify-center">
+        <button
+          id="btn_remote_move_up"
+          onClick={() => onPressKey("CtrlArrowUp")}
+          className="w-9 h-9 bg-neutral-800 hover:bg-amber-500/15 active:bg-amber-500/25 hover:text-amber-400 text-neutral-400 rounded-full flex items-center justify-center transition-all active:scale-90 border border-neutral-800"
+          title="上移频道 (Ctrl+↑)"
+        >
+          <ArrowUp className="w-3.5 h-3.5" />
+        </button>
+        <button
+          id="btn_remote_move_down"
+          onClick={() => onPressKey("CtrlArrowDown")}
+          className="w-9 h-9 bg-neutral-800 hover:bg-amber-500/15 active:bg-amber-500/25 hover:text-amber-400 text-neutral-400 rounded-full flex items-center justify-center transition-all active:scale-90 border border-neutral-800"
+          title="下移频道 (Ctrl+↓)"
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+        </button>
+        <button
+          id="btn_remote_delete"
+          onClick={() => onPressKey("DeleteChannel")}
+          className="w-9 h-9 bg-neutral-800 hover:bg-red-500/15 active:bg-red-500/25 hover:text-red-400 text-neutral-400 rounded-full flex items-center justify-center transition-all active:scale-90 border border-neutral-800"
+          title="删除频道 (Delete)"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       {/* Back button & Instructions */}
       <button
         id="btn_remote_back"
         onClick={() => onPressKey("Backspace")}
-        className="mt-4 w-full py-2 bg-neutral-800 hover:bg-neutral-750 active:bg-red-950 active:hover:bg-red-900 active:text-red-200 text-neutral-300 rounded-xl text-xs flex items-center justify-center gap-1 transition-all active:scale-95 font-sans font-medium border border-neutral-800"
+        className="mt-3 w-full py-2 bg-neutral-800 hover:bg-neutral-750 active:bg-red-950 active:hover:bg-red-900 active:text-red-200 text-neutral-300 rounded-xl text-xs flex items-center justify-center gap-1 transition-all active:scale-95 font-sans font-medium border border-neutral-800"
         title="返回 (Backspace/Esc)"
       >
         <CornerDownLeft className="w-3.5 h-3.5" />
