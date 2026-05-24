@@ -1,106 +1,150 @@
-# TV Live Player (网络电视直播播放器)
+# 万能电视直播 (TV Live Player)
 
-一款面向大屏 TV、移动端及网页端的跨平台**纯客户端网络电视播放器**。支持一键快速导入 `.m3u` / `.m3u8` 直播订阅源、触屏手势、键盘及遥控器上下换台切换，100% 保证用户隐私，完全不需要搭建任何中转云端服务器。
-
----
-
-## ✨ 核心特性
-
-- **100% 离线与隐私安全**：所有的订阅源解析、电视频道存储、状态记忆及直播流播放完全在您的本地浏览器沙箱或安卓 APP 内部进行，无任何后台数据上传。
-- **全方位导入机制**：
-  - **直接拖拽或手动选择本地 M3U / M3U8 文件**完美解析（100% 免除一切 CORS 跨域网页拦截）。
-  - **直接粘贴 M3U 文本内容**解析。
-  - **输入公网 M3U 订阅源链接**直接请求（自带公共 CORS 跨域路由 fallback）。
-- **流畅解码**：内嵌成熟稳定的 `hls.js` 引擎，可流畅解码并加载各大公开精修的高清播放源视频。
-- **跨平台操控适配**：支持键盘 <kbd>↑</kbd> / <kbd>↓</kbd> 键极速秒换台，完美适配传统智能电视遥控器或安卓盒子。
+> 面向 Android TV 的纯客户端全屏电视直播应用，基于 React + Vite + Capacitor 构建，遥控器全操控，无需手机端。
 
 ---
 
-## 🚀 编译与打包方案
+## 运行环境
 
-本项目已经移除了所有第三方后端服务器及 Gemini AI 服务依赖，完全重构为**轻量级 SPA（单页面应用）前端应用**，并采用现代 **Capacitor** 容器将其桥接编译为原生 Android 安装包（.apk）。
-
-您拥有以下两种主要方案来生成专属的 `.apk` 安装包：
-
-### 方案一：使用 GitHub Actions 配置云端自动化编译（省时、省力外置编译，推荐 🌟）
-
-无需在本地配置任何复杂的 Android 软件开发环境（Java、Android SDK 等），直接将此代码仓库托管至 GitHub，即可自动云端构建：
-
-1. **推送代码**：将代码提交并 `git push` 到您的 GitHub 仓库的 `master` 或 `main` 分支。
-2. **触发构建**：项目根目录已置入 `.github/workflows/build-apk.yml` 自动化文件。每次您推送代码时，GitHub Actions 就会自动启动打包。
-3. **获取安装包 (.apk)**：
-   - 打开您的 GitHub 仓库，点击顶部的 **Actions** 选项卡。
-   - 在左侧列表中，点击 **Build Android APK** 工作流。
-   - 点击最新一次运行成功的记录，拉到页面最下方的 **Artifacts** 区域。
-   - 看到名为 `tv-live-player-apk` 的构建产物，点击即可下载已打包完毕的安卓 `.apk` 文件。
+| 项目 | 规格 |
+|------|------|
+| 最低系统 | **Android 6.0** (API 23) |
+| WebView 内核 | Chrome 44+ |
+| 屏幕方向 | 横屏 |
+| 交互方式 | **纯遥控器** (D-pad + OK + Menu + Back) |
 
 ---
 
-### 方案二：在 Windows 11 本地电脑进行编译
+## 遥控器按键映射
 
-如果您想在自己的本地 Windows 11 电脑完成 Android APK 构建，请按照以下完整的操作步骤配置并执行。
+电视遥控器只有 **6 个可用键**：↑ ↓ ← → OK Menu Back
 
-#### 📌 前期基础工具准备
+### 各层操作
 
-在开始编译前，请确保您的 Windows 11 系统中安装了以下核心工具：
+| 按键 | 纯视频层 | OSD 层 | 分类条 | 频道列表 | 操作区 |
+|------|---------|--------|--------|---------|--------|
+| **↑ ↓** | 无操作 | 无操作 | ↑回视频 ↓进列表 | 选台 | **退回列表** |
+| **← →** | 无操作 | 无操作 | 切分类 | ←分类 →操作区 | ⬆⬇🗑 间切换 |
+| **OK** | 弹出 OSD | 打开设置 | 确认分类 | **播放此频道** | 执行操作 |
+| **Menu** | 打开设置 | 打开设置 | 打开设置 | 打开设置 | 打开设置 |
+| **Back** | 退出提示 | 关闭 OSD | 回视频 | 回视频 | 退回列表 |
 
-1. **Node.js**: [下载并安装 Node.js 18 或 20 LTS](https://nodejs.org/)。
-2. **Java JDK 17**: [下载并安装 Java JDK 17](https://www.oracle.com/java/technologies/downloads/#java17)（推荐使用 Azul Zoo 或 Oracle JDK，安装完毕后请确保系统环境变量 `JAVA_HOME` 指向 JDK 的根目录）。
-3. **Android Studio**: [下载并安装 Android Studio](https://developer.android.com/studio)。
-   - 打开 Android Studio 偏好设置中的 **SDK Manager**，下载并安装 **Android SDK (建议 API 33 及以上)**。
-   - 完成安装后，请在系统的环境变量中配置 `ANDROID_HOME`。例如指向：`C:\Users\您的用户名\AppData\Local\Android\Sdk`。
+### 退出
+**纯视频层** 按 Back → 屏幕底部显示 "再按一次返回键退出" → 3 秒内再按 Back → 退出应用。
 
-#### 🛠️ Windows 11 本地具体编译步骤
-
-打开 Windows 终端（PowerShell 或 CMD），进入该项目代码的根目录，按顺序执行以下命令：
-
-##### 第一步：安装前端依赖库
-```bash
-npm install
-```
-
-##### 第二步：打包前端静态资源 (SPA)
-```bash
-npm run build
-```
-执行完毕后，项目根目录下会生成一个 `dist` 静态资源目录。
-
-##### 第三步：添加并初始化 Capacitor 安卓原生层
-*（如果您的项目根目录下尚未生成 `android` 目录，请运行本条添加命令）*
-```bash
-npx cap add android
-```
-
-##### 第四步：同步分发前端代码到安卓平台工程
-每当您修改了前端代码（运行了 `npm run build`）之后，都需要运行同步指令将最新的网页更新传到安卓原生包裹工程中：
-```bash
-npx cap sync android
-```
-
-##### 第五步：编译打包 APK
-###### 方法 A（推荐：通过命令行快速直接打包生成 APK）
-进入 `android` 目录，直接借助生成的 Gradle 命令在本地环境快速自动构建：
-```powershell
-cd android
-# 在 Windows Powershell 下执行本地构建（请确保配置好 $env:JAVA_HOME）
-.\gradlew.bat assembleDebug
-```
-**🎉 APK 产物路径**：
-编译成功后，生成的通用测试版 APK 文件将在以下路径：
-`安卓文件夹根目录\android\app\build\outputs\apk\debug\app-debug.apk`
-您可以直接通过微信、数据线等将该 `.apk` 文件发送并安装至您的安卓智能电视机、安卓手机或电视盒子上。
-
-###### 方法 B（通过 Android Studio 可视化管理与调试）
-如果您需要更换 APP 图标、包名，或希望以签名发布（Release）的形式生成安全的线上商用包：
-```bash
-# 这将会为您自动在 Android Studio 中拉起我们的安卓项目工程
-npx cap open android
-```
-- Android Studio 完整载入项目后，可以在顶部菜单栏选择 `Build` -> `Build Bundle(s) / APK(s)` -> `Build APK(s)` 进行一键本地生成。
-- 若要真机或模拟器连调，可用 USB 数据线连接安卓测试设备，在开发者模式下点击编辑器的绿色 **Run (Run 'app')** 箭头按钮在线调试。
+### 频道操作（频道列表按 → 进入操作区）
+- 聚焦操作区后用 ←→ 切换 ⬆上移 / ⬇下移 / 🗑删除，OK 执行
 
 ---
 
-## 🛠️ 主流电视直播源参考资源
+## 架构概览
 
-您可以利用自带的播放器配置模块方便地加入国内外著名的精修 M3U 公开直连线路（如范明明的精修 IPv6 经典源、以及其他肥样精修源等）。由于全客户端运行在您的本地网络，如果您是在国内运行，请确保您的宽带支持并开启了 IPv6（如光猫设置），以便流畅秒播极速高清频道。
+```
+d:\TV-Live-Player\
+├── index.html               # Vite 入口 (dev)
+├── vite.config.ts           # 构建配置 + 旧版兼容
+├── package.json
+├── tsconfig.json
+├── capacitor.config.json    # Capacitor 配置
+├── .github/workflows/
+│   └── build-apk.yml        # GitHub Actions 自动编译
+├── src/
+│   ├── main.tsx             # React 入口
+│   ├── App.tsx              # 主组件: 四层焦点 + 遥控器导航 + 数据持久化
+│   ├── index.css            # 全局样式 (Android 系统字体)
+│   ├── types.ts             # TVChannel, CustomSource 类型
+│   └── components/
+│       ├── TVPlayer.tsx     # 视频播放器 (hls.js)
+│       └── CustomSourceModal.tsx  # 设置弹窗 (M3U导入/管理/备份/分类/恢复出厂)
+│   └── data/
+│       └── defaultChannels.ts  # 初始频道数据 (出厂备份)
+│   └── utils/
+│       └── m3uParser.ts     # M3U 文件解析器
+├── dist/                    # 构建产物 (Capacitor 从这里同步)
+└── android/                 # Capacitor Android 原生壳 (GitHub Actions 运行时生成)
+```
+
+### 技术栈
+
+| 层 | 技术 |
+|----|------|
+| UI 框架 | React 19 + TypeScript |
+| 样式 | Tailwind CSS v4 |
+| 构建 | Vite 6 |
+| 打包 | Capacitor 6 → APK |
+| 视频解码 | hls.js |
+| CI/CD | GitHub Actions |
+| 图标 | lucide-react |
+
+---
+
+## GitHub Actions 自动编译
+
+**无需本地编译环境。** Push 到 `main`/`master` 分支自动触发。
+
+### 工作流: `.github/workflows/build-apk.yml`
+
+```
+推送代码 → npm install → npm run build → npx cap sync android → ./gradlew assembleDebug → 上传 APK
+```
+
+### 下载 APK
+
+1. GitHub 仓库 → **Actions** 选项卡
+2. 左侧点击 **Build Android APK**
+3. 最新一次成功运行 → 底部 **Artifacts** → 下载 `tv-live-player-apk`
+
+### 关键配置
+- Node.js 20
+- Java JDK 17 (Zulu)
+- 编译目标: `targetSdkVersion = 23`, `minSdkVersion = 22`
+
+---
+
+## CSS / JS 兼容性处理 (Android 6 关键)
+
+Android 6 WebView 内核为 Chrome 44-51，不支持以下现代特性，构建时均已自动降级：
+
+| 不兼容特性 | Chrome 版本要求 | 处理方式 |
+|------------|:--:|------|
+| `<script type="module">` | 61+ | `@vitejs/plugin-legacy` → SystemJS 降级 |
+| `@layer` | 99+ | 自定义 Vite 插件剥离 `@layer` 包装块 |
+| `oklch()` / `lab()` | 111+ | lightningcss 转为 `rgb()` / hex |
+| `:where()` / `:is()` | 88+ | 自定义 Vite 插件展开为平级选择器 |
+| `@property` | 85+ | 构建后移除 |
+| `color-mix()` | 111+ | 替换为直接颜色值 |
+| `Proxy` | 49+ | `proxy-polyfill` (Google 出品, 2.5KB) |
+| ES6+ 语法 | — | `@babel/preset-env` 转 ES5 |
+| Google Fonts 外链 | — | 改为 Android 系统字体 (Roboto / Noto Sans SC) |
+| `https` scheme | — | Capacitor 改为 `http` + `allowMixedContent` |
+
+构建后 `dist/index.html` 由 `htmlCompatPlugin` 完全重写为纯 `<script>` 串行加载，不依赖 `type="module"` / `nomodule` / `crossorigin`。
+
+---
+
+## 数据持久化
+
+所有数据存储在 `localStorage`，切换频道时**立即写入**，崩溃不丢失。
+
+| Key | 类型 | 说明 |
+|-----|------|------|
+| `tv_channels` | `TVChannel[]` | 全部频道 (初始 = DEFAULT_CHANNELS) |
+| `tv_favorites` | `string[]` | 收藏的频道 ID |
+| `tv_sources` | `CustomSource[]` | 已订阅的 M3U 播放源 |
+| `tv_last_channel` | `string` | 上次退出的频道 ID (启动恢复) |
+
+---
+
+## 频道模型
+
+**所有频道平等** — 无"内置/自定义"区分。`INITIAL_DEFAULT_CHANNELS` 仅用于：
+1. 首次启动填充
+2. "恢复出厂设置"还原
+
+任何频道均可删除、排序，均可设置收藏。
+
+---
+
+## 恢复出厂设置
+
+设置弹窗 → 管理 Tab → 底部 🔄 按钮。清除所有 localStorage 数据，恢复 `INITIAL_DEFAULT_CHANNELS`。
