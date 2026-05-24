@@ -184,24 +184,30 @@ GitHub 仓库 → **Actions** → 最新运行 → 底部 Artifacts → 下载 `
 
 ---
 
-## CSS / JS 兼容性处理 (Android 6 关键)
+## CSS / JS 兼容性处理 (Android 6 ~ Android 16 全覆盖)
 
-Android 6 WebView 内核为 Chrome 44-51，不支持以下现代特性，构建时均已自动降级：
+Android 6 WebView (Chrome 44) 与 Android 16 WebView (Chrome 130+) 均需特殊处理，构建时自动降级：
 
-| 不兼容特性 | Chrome 版本要求 | 处理方式 |
-|------------|:--:|------|
-| `<script type="module">` | 61+ | `@vitejs/plugin-legacy` → SystemJS 降级 |
-| `@layer` | 99+ | 自定义 Vite 插件剥离 `@layer` 包装块 |
-| `oklch()` / `lab()` | 111+ | lightningcss 转为 `rgb()` / hex |
-| `:where()` / `:is()` | 88+ | 自定义 Vite 插件展开为平级选择器 |
-| `@property` | 85+ | 构建后移除 |
-| `color-mix()` | 111+ | 替换为直接颜色值 |
-| `Proxy` | 49+ | `proxy-polyfill` (Google 出品, 2.5KB) |
-| ES6+ 语法 | — | `@babel/preset-env` 转 ES5 |
-| Google Fonts 外链 | — | 改为 Android 系统字体 (Roboto / Noto Sans SC) |
-| `https` scheme | — | Capacitor 改为 `http` + `allowMixedContent` |
+| 不兼容特性 | Chrome 要求 | 影响设备 | 处理方式 |
+|------------|:--:|------|------|
+| **Tailwind v4 `@supports` 门控** | — | **Android 16+** | 剥离 `@supports` 包装 → 变量始终生效 |
+| **`::backdrop` 伪元素** | 47+ | **Android 6** | 从选择器列表中移除 `,::backdrop` |
+| **`@supports (color:red)` 回退** | 28+ | 全部 | 剥离包装 → 内层 var() 靠源码序覆盖 |
+| **`<script type="module">`** | 61+ | Android 6 | 双路径：ESM (Chrome 61+) / SystemJS (旧版) |
+| `@layer` | 99+ | Android 6 | 剥离 `@layer` → 源码序级联 |
+| `oklch()` / `lab()` | 111+ | Android 6 | lightningcss 转 `rgb()` / hex |
+| `:where()` / `:is()` | 88+ | Android 6 | 展开为内层选择器 |
+| `@property` | 85+ | Android 6 | 移除规则 |
+| `color-mix()` | 111+ | Android 6 | 替换为直接颜色值 |
+| `Proxy` | 49+ | Android 6 | `proxy-polyfill` |
+| ES6+ 语法 | — | Android 6 | `@babel/preset-env` 转 ES5 |
+| 字体外链 | — | Android 6 | 系统字体 (Roboto / Noto Sans SC) |
+| `https` scheme | — | Android 6 | Capacitor `http` + `allowMixedContent` |
 
-构建后 `dist/index.html` 由 `htmlCompatPlugin` 完全重写为纯 `<script>` 串行加载，不依赖 `type="module"` / `nomodule` / `crossorigin`。
+### 双路径加载 (HTML)
+- **Chrome 61+** → 原生 ESM (`<script type="module">`)，快速加载
+- **Chrome 44–60** → `proxy.min.js` → `polyfills-legacy` → SystemJS → App
+- 检测方式：`'noModule' in document.createElement('script')`
 
 ---
 

@@ -8,16 +8,84 @@ import {readFileSync, writeFileSync, existsSync, copyFileSync} from 'fs';
 
 // ---------------------------------------------------------------------------
 // CSS compat pipeline: transforms Tailwind v4 output to Chrome 44 (Android 6)
+// while keeping it working on Chrome 130+ (Android 16)
 // ---------------------------------------------------------------------------
 
-/** Strip @layer { } wrappers (Chrome 99+, Chrome 44 ignores them entirely) */
+/**
+ * Strip @supports blocks — keep inner rules, discard the wrapper.
+ *
+ * WHY:
+ * - Tailwind v4 gates its entire CSS variable init behind:
+ *   @supports (((-webkit-hyphens:none)) and (not (margin-trim:inline)))
+ *          or ((-moz-orient:inline) and (not (color:rgb(from red r g b))))
+ *   On Chrome 130+ this evaluates to FALSE → ALL styles lost.
+ * - Also handles many @supports (color:red){...} opacity-fallback blocks —
+ *   stripping them is safe because the inner var() already takes precedence
+ *   from the flat CSS cascade (later-in-file wins).
+ */
+function stripAtSupports(css: string): string {
+  let out = '';
+  let i = 0;
+
+  while (i < css.length) {
+    const idx = css.indexOf('@supports', i);
+    if (idx === -1) { out += css.slice(i); break; }
+
+    out += css.slice(i, idx);
+
+    // Find opening brace of the @supports block
+    const openBrace = css.indexOf('{', idx);
+    if (openBrace === -1) { out += css.slice(idx); break; }
+
+    // Match braces to find closing }
+    let depth = 1;
+    let pos = openBrace + 1;
+    while (pos < css.length && depth > 0) {
+      if (css[pos] === '{') depth++;
+      else if (css[pos] === '}') depth--;
+      pos++;
+    }
+
+    // Inner content (excludes the @supports (condition){ and final })
+    out += css.slice(openBrace + 1, pos - 1);
+    i = pos;
+  }
+
+  return out;
+}
+
+/**
+ * Remove ::backdrop from selector lists.
+ *
+ * WHY:
+ * - Chrome 44 (Android 6) does NOT support ::backdrop (Chrome 47+).
+ * - In CSS, an unrecognized pseudo-element in a selector list
+ *   causes the ENTIRE rule to be discarded (pre-Chrome 88 behavior).
+ * - Tailwind v4 puts ::backdrop in the universal reset selector:
+ *   *,:before,:after,::backdrop
+ *   → Discarding this rule wipes ALL CSS variables → no styles.
+ * - Removing ,::backdrop yields *,:before,:after which is safe.
+ */
+function stripBackdrop(css: string): string {
+  return css
+    .replace(/,::backdrop/g, '')
+    .replace(/::backdrop,/g, '');
+}
+
+/**
+ * Strip @layer wrappers (Chrome 99+).
+ * Chrome 44 would ignore @layer anyway, but keeping rules inside @layer
+ * that get discarded by other issues is worse. Stripping ensures rules
+ * participate in the normal cascade (later wins ≈ correct for TW order).
+ */
 function stripAtLayer(css: string): string {
   let out = '', i = 0;
   while (i < css.length) {
     const m = css.slice(i).match(/@layer\s+[\w-]+\s*\{/);
     if (!m || m.index === undefined) { out += css.slice(i); break; }
     out += css.slice(i, i + m.index);
-    let pos = i + m.index + m[0].length, depth = 1, inStr = false, ch = '';
+    let pos = i + m.index + m[0].length, depth = 1;
+    let inStr = false, ch = '';
     while (pos < css.length && depth > 0) {
       const c = css[pos];
       if (inStr) { if (c === ch && css[pos-1] !== '\\') inStr = false; }
@@ -32,9 +100,17 @@ function stripAtLayer(css: string): string {
   return out.replace(/@layer\s+\w+\s*;/g, '');
 }
 
-/** Remove :where() / :is() from selectors by counting balanced parentheses */
+/**
+ * Remove :where() / :is() from selectors by counting balanced parentheses.
+ *
+ * WHY:
+ * - Chrome 44 does NOT support :where() or :is() (Chrome 88+).
+ * - An unrecognized pseudo-class with parens causes the selector to be
+ *   invalid, discarding the entire rule (pre-Chrome 88).
+ * - Stripping them preserves the inner selectors, changing specificity
+ *   but maintaining the cascade via source order.
+ */
 function stripPseudoWhereIs(css: string): string {
-  // Handle both :where( and :is(
   for (const prefix of [':where(', ':is(']) {
     let out = '';
     let i = 0;
@@ -42,7 +118,6 @@ function stripPseudoWhereIs(css: string): string {
       const idx = css.indexOf(prefix, i);
       if (idx === -1) { out += css.slice(i); break; }
       out += css.slice(i, idx);
-      // Find matching closing paren
       let pos = idx + prefix.length;
       let depth = 1;
       while (pos < css.length && depth > 0) {
@@ -50,7 +125,6 @@ function stripPseudoWhereIs(css: string): string {
         else if (css[pos] === ')') depth--;
         pos++;
       }
-      // Extract inner content (skip the wrapping parens)
       const inner = css.slice(idx + prefix.length, pos - 1);
       out += inner;
       i = pos;
@@ -60,27 +134,32 @@ function stripPseudoWhereIs(css: string): string {
   return css;
 }
 
-/** Replace color-mix() with a safe fallback for Chrome 44 */
+/**
+ * Replace color-mix() with safe fallbacks for Chrome 44.
+ */
 function stripColorMix(css: string): string {
-  // Pattern 1: color-mix(in XXX, currentcolor N%, transparent) → currentcolor
-  css = css.replace(/color-mix\(in\s+(?:oklab|lab)\s*,\s*currentcolor\s+\d+%\s*,\s*transparent\s*\)/g, 'currentcolor');
-  
-  // Pattern 2: color-mix(in XXX, var(--X) N%, transparent) → var(--X)
-  css = css.replace(/color-mix\(in\s+(?:oklab|lab)\s*,\s*(var\(--[\w-]+\))\s+\d+%\s*,\s*transparent\s*\)/g, '$1');
-  
-  // Pattern 3: color-mix(in XXX, X, X) → X (identity)
-  css = css.replace(/color-mix\(in\s+(?:oklab|lab)\s*,\s*([^,]+?)\s*,\s*\1\s*\)/g, '$1');
-  
-  // Pattern 4: any remaining color-mix → extract first color arg as fallback
-  css = css.replace(/color-mix\(in\s+(?:oklab|lab)\s*,\s*([^,]+?)\s*,[^)]*\)/g, '$1');
-  
+  css = css.replace(
+    /color-mix\(in\s+(?:oklab|lab)\s*,\s*currentcolor\s+\d+%\s*,\s*transparent\s*\)/g,
+    'currentcolor'
+  );
+  css = css.replace(
+    /color-mix\(in\s+(?:oklab|lab)\s*,\s*(var\(--[\w-]+\))\s+\d+%\s*,\s*transparent\s*\)/g,
+    '$1'
+  );
+  css = css.replace(
+    /color-mix\(in\s+(?:oklab|lab)\s*,\s*([^,]+?)\s*,\s*\1\s*\)/g,
+    '$1'
+  );
+  css = css.replace(
+    /color-mix\(in\s+(?:oklab|lab)\s*,\s*([^,]+?)\s*,[^)]*\)/g,
+    '$1'
+  );
   return css;
 }
 
 /**
- * Strip @property rules (Chrome 85+). Chrome 44 will ignore @property,
- * but these define animation-friendly interpolations for Tailwind classes.
- * Removing them means CSS variables still work, just without smooth interpolation.
+ * Strip @property rules (Chrome 85+).
+ * Removing them means CSS variables still work, just without interpolation.
  */
 function stripAtProperty(css: string): string {
   return css.replace(/@property\s+--[\w-]+\s*\{[^}]*\}/g, '');
@@ -88,7 +167,7 @@ function stripAtProperty(css: string): string {
 
 function cssCompatPlugin(): Plugin {
   return {
-    name: 'css-compat-chrome44',
+    name: 'css-compat-all',
     apply: 'build',
     enforce: 'post',
     generateBundle(_opts, bundle) {
@@ -96,7 +175,7 @@ function cssCompatPlugin(): Plugin {
         if (fileName.endsWith('.css') && asset.type === 'asset' && typeof asset.source === 'string') {
           let css = asset.source as string;
 
-          // Step 1: lightningcss FIRST → oklch→rgb + overall downgrade
+          // Step 1: lightningcss → oklch→rgb + modern→Chrome44 downgrade
           const result = transform({
             filename: fileName,
             code: Buffer.from(css),
@@ -105,13 +184,22 @@ function cssCompatPlugin(): Plugin {
           });
           css = new TextDecoder().decode(result.code);
 
-          // Step 2: strip @layer blocks (AFTER lightningcss — it may reorder them)
+          // Step 2: Strip @supports wrappers (fixes Android 16 blank page)
+          css = stripAtSupports(css);
+
+          // Step 3: Remove ::backdrop from selectors (fixes Android 6 blank page)
+          css = stripBackdrop(css);
+
+          // Step 4: Strip @layer blocks
           css = stripAtLayer(css);
-          // Step 3: strip :where() and :is() from selectors
+
+          // Step 5: Strip :where() and :is() from selectors
           css = stripPseudoWhereIs(css);
-          // Step 4: strip @property rules  
+
+          // Step 6: Strip @property rules
           css = stripAtProperty(css);
-          // Step 5: strip color-mix() to safe fallbacks
+
+          // Step 7: Replace color-mix() with fallbacks
           css = stripColorMix(css);
 
           console.log(`[css-compat] ${fileName}: ${asset.source.length} → ${css.length} chars`);
@@ -123,42 +211,39 @@ function cssCompatPlugin(): Plugin {
 }
 
 // ---------------------------------------------------------------------------
-// HTML compat plugin: rewrites the generated index.html to work on Chrome 48
-// (Android 6 WebView) by removing type=module/nomodule/crossorigin and using
-// a plain sequential script loading approach.
+// HTML compat plugin: dual-path loading for old & new browsers
+//
+// - Modern browsers (Chrome 61+): native ESM via <script type="module">
+// - Legacy browsers (Chrome 44–60): SystemJS polyfill + core-js
+//
+// Detection: 'noModule' in HTMLScriptElement → Chrome 61+
 // ---------------------------------------------------------------------------
 function htmlCompatPlugin(): Plugin {
   return {
-    name: 'html-compat-chrome48',
+    name: 'html-compat-dual',
     apply: 'build',
     enforce: 'post',
     closeBundle() {
-      // ── Copy Proxy polyfill for Chrome 48 (Proxy = Chrome 49+) ──
       const distAssets = path.resolve(__dirname, 'dist', 'assets');
+
+      // Copy Proxy polyfill (Chrome 49+, need for Chrome 44–48)
       const proxySrc = path.resolve(__dirname, 'node_modules', 'proxy-polyfill', 'proxy.min.js');
       const proxyDst = path.join(distAssets, 'proxy.min.js');
       copyFileSync(proxySrc, proxyDst);
-      console.log('[html-compat] Copied proxy-polyfill to dist/assets/proxy.min.js');
+      console.log('[html-compat] Copied proxy-polyfill');
 
       const htmlPath = path.resolve(__dirname, 'dist', 'index.html');
       if (!existsSync(htmlPath)) return;
-      
+
       let html = readFileSync(htmlPath, 'utf8');
 
-      // Extract the CSS link and asset filenames
-      const cssMatch = html.match(/<link[^>]+href="(\/assets\/[^"]+\.css)"/);
-      const polyfillsSrc = html.match(/id="vite-legacy-polyfill"[^>]+src="([^"]+)"/);
-      const legacyEntrySrc = html.match(/id="vite-legacy-entry"[^>]+data-src="([^"]+)"/);
+      // Extract paths from plugin-legacy output
+      const cssHref = (html.match(/<link[^>]+href="(\/assets\/[^"]+\.css)"/) || [])[1] || '';
+      // Main entry: first type=module script with src=index- (NOT polyfills=)
+      const modernEntry = (html.match(/<script type="module"[^>]*src="(\/assets\/index-[^"]+\.js)"/) || [])[1] || '';
+      const polyfillPath = (html.match(/id="vite-legacy-polyfill"[^>]+src="([^"]+)"/) || [])[1] || '';
+      const legacyPath = (html.match(/id="vite-legacy-entry"[^>]+data-src="([^"]+)"/) || [])[1] || '';
 
-      const cssHref = cssMatch ? cssMatch[1] : '/assets/index.css';
-      const polyfillPath = polyfillsSrc ? polyfillsSrc[1] : '';
-      const legacyPath = legacyEntrySrc ? legacyEntrySrc[1] : '';
-
-      // Extract the diagnostic script (everything between <body> and the first <script nomodule>)
-      const bodyMatch = html.match(/<body>([\s\S]*?)<script nomodule/);
-      const diagHtml = bodyMatch ? bodyMatch[1] : '';
-
-      // Build a completely new, simple HTML that works on ALL browsers
       const newHtml = `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -173,44 +258,50 @@ function htmlCompatPlugin(): Plugin {
 <div id="__diag" style="position:fixed;top:0;left:0;right:0;padding:24px 32px;background:#1a0000;color:#ff4444;font-size:14px;z-index:999999;font-family:monospace;display:none;"></div>
 <script>
 (function(){
-var errors=[],shown=false,diag=document.getElementById('__diag');
-window.onerror=function(m,u,l,c,e){errors.push((e&&e.stack)||(m+' at '+u+':'+l))};
-function showDiag(){
-if(shown)return;
-if(document.getElementById('root').children.length>0)return;
-shown=true;
-var h='<b>⚠ PAGE LOAD FAILED</b><br><br>';
-h+='<span style="color:#aaa">Browser: '+navigator.userAgent+'</span><br><br>';
-if(errors.length>0){h+='<b>JS Errors:</b><br>';for(var i=0;i<errors.length;i++)h+='• <span style="color:#ff8888">'+errors[i].replace(/</g,'&lt;')+'</span><br>'}
-else{h+='<span style="color:#ffa500">No JS errors detected.</span><br>'+'<span style="color:#aaa">Possible causes: script failed to load, blocked by firewall, or WebView issue.</span>'}
-diag.innerHTML=h;diag.style.display='block'}
-setTimeout(showDiag,5000);
-window.addEventListener('DOMContentLoaded',function(){if(errors.length>0)setTimeout(showDiag,1000)})
-})();
-</script>
-<!-- Step 0: Polyfill ES6 Proxy (Chrome 49+, Chrome 48 needs this) -->
-<script src="/assets/proxy.min.js"></script>
-<!-- Step 1: Load SystemJS + core-js polyfills -->
-<script src="${polyfillPath}"></script>
-<!-- Step 2: Once polyfills loaded, boot the app via SystemJS -->
-<script>
-(function(){
-if(typeof System==='undefined'){
-  document.getElementById('__diag').innerHTML='<b>⚠ FATAL</b><br><br>SystemJS failed to load from:<br><span style="color:#ff8888">'+'${polyfillPath}'+'</span><br><br>Check that the file exists in the APK assets.';
-  document.getElementById('__diag').style.display='block';
-  return;
+var errors=[],shown=false,diag=document.getElementById('__diag'),root=document.getElementById('root');
+window.onerror=function(m,u,l,c,e){errors.push((e&&e.stack)||(m))};
+function fail(msg){
+  if(shown)return;
+  shown=true;
+  diag.innerHTML='<b>⚠ '+msg+'</b><br><br><span style="color:#aaa">UA: '+navigator.userAgent+'</span><br>'+errors.map(function(e){return'• <span style="color:#ff8888">'+String(e).replace(/</g,'&lt;')+'</span>'}).join('<br>');
+  diag.style.display='block';
 }
-System.import('${legacyPath}').catch(function(err){
-  document.getElementById('__diag').innerHTML='<b>⚠ APP LOAD FAILED</b><br><br><span style="color:#ff8888">'+String(err).replace(/</g,'&lt;')+'</span>';
-  document.getElementById('__diag').style.display='block';
-});
+function loadScript(src,cb){
+  var s=document.createElement('script');
+  s.src=src;
+  s.onload=cb;
+  s.onerror=function(){fail('Failed to load: '+src)};
+  document.head.appendChild(s);
+}
+// Detect ESM support: 'noModule' prop exists on Chrome 61+
+var isModern='noModule' in document.createElement('script');
+if(isModern){
+  // ── Modern path: native ES modules ──
+  var s=document.createElement('script');
+  s.type='module';
+  s.src='${modernEntry}';
+  s.onerror=function(){fail('ESM entry failed to load')};
+  document.head.appendChild(s);
+}else{
+  // ── Legacy path: polyfills → SystemJS → app ──
+  loadScript('/assets/proxy.min.js',function(){
+    loadScript('${polyfillPath}',function(){
+      if(typeof System==='undefined'){fail('SystemJS missing');return}
+      System.import('${legacyPath}').catch(function(e){fail(String(e))});
+    });
+  });
+}
+// Timeout: if nothing rendered after 8s, show diag
+setTimeout(function(){
+  if(root.children.length===0&&!shown)fail('Page load timeout — check network or WebView')
+},8000);
 })();
 </script>
 </body>
 </html>`;
 
       writeFileSync(htmlPath, newHtml, 'utf8');
-      console.log(`[html-compat] Rewrote index.html: removed module/nomodule, use plain <script> cascade`);
+      console.log('[html-compat] Rewrote index.html: dual-path (ESM + SystemJS)');
     },
   };
 }
