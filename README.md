@@ -52,6 +52,13 @@ localStorage ←→ App.tsx (state) → TVPlayer (播放)
                     ↕
            CustomSourceModal (编辑)
 ```
+
+### ⚠️ AI 工作规范（每次会话必须遵守）
+
+1. **修改源码后自动更新本 README** — 如果改动涉及导航逻辑、按键映射、组件结构、数据流、Tab 变化等，必须同步更新 README 中对应的文档段落。
+2. **优先读取 README 而非全部源码** — 本 README 已包含完整的架构说明和导航状态机，先用 `Read` 读 README 了解全貌，再按需读具体文件。
+3. **用 Grep 代替全文件 Read** — 需要定位代码时，优先 `Grep` 搜索关键字，避免通读整个文件。
+4. **并行读取无关文件** — 同时读取多个独立文件时，在一次调用中并行发起。
 <!-- AI_SESSION_END -->
 
 ---
@@ -148,21 +155,27 @@ d:\TV-Live-Player\
 
 ---
 
-## GitHub Actions 自动编译
+## GitHub Actions 自动编译 & 发布
 
-**无需本地编译环境。** Push 到 `main`/`master` 分支自动触发。
+**无需本地编译环境。** Push 到 `main`/`master` 分支自动编译并发布到 Release。
 
 ### 工作流: `.github/workflows/build-apk.yml`
 
 ```
-推送代码 → npm install → npm run build → npx cap sync android → ./gradlew assembleDebug → 上传 APK
+推送代码 → npm install → npm run build → npx cap sync android → ./gradlew assembleDebug → 发布 Release
 ```
 
-### 下载 APK
+### 📥 下载 APK（推荐：从 Release 下载）
 
-1. GitHub 仓库 → **Actions** 选项卡
-2. 左侧点击 **Build Android APK**
-3. 最新一次成功运行 → 底部 **Artifacts** → 下载 `tv-live-player-apk`
+1. GitHub 仓库 → 右侧 **Releases** 栏
+2. 点击最新 Release（`release-{编号}`）
+3. 下载 `tv-live-player-debug.apk`
+
+> 每次成功推送后自动创建 Release，无需等待 Actions artifact 过期（14天）。
+
+### 备选：从 Actions Artifact 下载
+
+GitHub 仓库 → **Actions** → 最新运行 → 底部 Artifacts → 下载 `tv-live-player-apk`
 
 ### 关键配置
 - Node.js 20
