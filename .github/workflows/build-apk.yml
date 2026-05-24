@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK & Release
 
 on:
   push:
@@ -15,6 +15,8 @@ jobs:
   build:
     name: Build React Web App & Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for creating releases
 
     steps:
       - name: Checkout Code
@@ -86,3 +88,28 @@ jobs:
           path: build-output/tv-live-player-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish to GitHub Release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "TV Live Player — ${{ github.ref_name }}"
+          tag_name: "release-${{ github.run_number }}"
+          body: |
+            ## 📦 自动构建 Release
+
+            - **分支**: `${{ github.ref_name }}`
+            - **提交**: `${{ github.sha }}`
+            - **运行编号**: #${{ github.run_number }}
+
+            > 由 GitHub Actions 自动编译发布，可直接下载 APK 安装到 Android TV 设备。
+
+            ### 安装说明
+            1. 下载下方 `tv-live-player-debug.apk`
+            2. 通过 U 盘或 ADB 安装到电视盒子
+            3. 最低支持 Android 6.0 (API 23)
+
+          files: build-output/tv-live-player-debug.apk
+          draft: false
+          prerelease: false
+          generate_release_notes: true
