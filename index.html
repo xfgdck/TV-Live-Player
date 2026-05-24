@@ -4,51 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>万能电视频道直播</title>
-    <!-- No external font dependencies — uses Android system fonts for instant rendering on TV devices -->
+    <title>万能电视频道直播 - TV</title>
   </head>
   <body>
-    <!-- Diagnostic: shows immediately, hidden by React once it mounts -->
     <div id="root"></div>
-    <div id="__diag" style="position:fixed;top:0;left:0;right:0;padding:24px 32px;background:#1a0000;color:#ff4444;font-size:14px;z-index:999999;font-family:monospace;display:none;"></div>
-    <script>
-      // Collect errors and show after 5s if React hasn't mounted
-      (function(){
-        var errors = [];
-        var shown = false;
-        var diag = document.getElementById('__diag');
-        window.onerror = function(msg, url, line, col, err) {
-          errors.push((err && err.stack) || (msg + ' at ' + url + ':' + line));
-        };
-        function showDiag() {
-          if (shown) return;
-          var root = document.getElementById('root');
-          // If React already rendered (root has children), don't show diag
-          if (root && root.children.length > 0) return;
-          shown = true;
-          var html = '<b>⚠ PAGE LOAD FAILED</b><br><br>';
-          html += '<span style="color:#aaa">Browser: ' + navigator.userAgent + '</span><br><br>';
-          if (errors.length > 0) {
-            html += '<b>JS Errors:</b><br>';
-            for (var i = 0; i < errors.length; i++) {
-              html += '• <span style="color:#ff8888">' + errors[i].replace(/</g,'&lt;') + '</span><br>';
-            }
-          } else {
-            html += '<span style="color:#ffa500">No JS errors detected.</span><br>';
-            html += '<span style="color:#aaa">Possible causes: script failed to load, blocked by firewall, or WebView issue.</span>';
-          }
-          diag.innerHTML = html;
-          diag.style.display = 'block';
-        }
-        // Show after 5s if React hasn't mounted
-        setTimeout(showDiag, 5000);
-        // Also show immediately on DOMContentLoaded with errors
-        window.addEventListener('DOMContentLoaded', function() {
-          if (errors.length > 0) setTimeout(showDiag, 1000);
-        });
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

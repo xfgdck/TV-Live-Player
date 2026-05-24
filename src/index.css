@@ -1,14 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  /* Use Android system fonts — no external Google Fonts dependency.
-     Roboto is the default Android font, available on all versions. */
+  /* Android TV system fonts */
   --font-sans: "Roboto", "Noto Sans SC", ui-sans-serif, system-ui, "Droid Sans Fallback", sans-serif;
   --font-mono: "Droid Sans Mono", "Cascadia Code", ui-monospace, monospace;
   --font-serif: "Noto Serif SC", Georgia, "Droid Serif", serif;
 }
 
-/* Hide scrollbar for category pills */
+/* ── TV base reset ── */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+/* ── Scrollbar ── */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -17,17 +29,17 @@
   display: none;
 }
 
-/* TV-friendly focus action buttons fade-in animation */
+/* ── Focus animations ── */
 @keyframes fade-in {
   from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
+  to   { opacity: 1; transform: scale(1); }
 }
 .animate-fade-in {
-  animation: fade-in 0.15s ease-out;
+  animation: fade-in 0.12s ease-out;
 }
 
-/* Ensure focused channel action buttons are large enough for TV */
-.tv-actions-btn {
-  min-width: 32px;
-  min-height: 32px;
+/* ── TV focus ring glow ── */
+@keyframes focus-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(245,158,11,0.4), 0 0 20px rgba(245,158,11,0.1); }
+  50%      { box-shadow: 0 0 14px rgba(245,158,11,0.6), 0 0 32px rgba(245,158,11,0.2); }
 }
