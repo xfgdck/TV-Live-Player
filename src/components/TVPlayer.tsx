@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 import { TVChannel } from "../types";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Maximize, Minimize } from "lucide-react";
 
 interface TVPlayerProps {
   channel: TVChannel | null;
@@ -9,9 +9,30 @@ interface TVPlayerProps {
 
 export default function TVPlayer({ channel }: TVPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // ─── Fullscreen tracking ───
+  useEffect(() => {
+    const handler = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    try {
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.();
+      } else {
+        containerRef.current?.requestFullscreen?.().catch(() => {});
+      }
+    } catch {}
+  }, []);
 
   const chUrl = channel?.url || "";
   useEffect(() => {
@@ -52,8 +73,18 @@ export default function TVPlayer({ channel }: TVPlayerProps) {
   }, [chUrl]);
 
   return (
-    <div className="absolute inset-0 bg-black">
+    <div ref={containerRef} className="absolute inset-0 bg-black" onDoubleClick={toggleFullscreen}>
       <video ref={videoRef} playsInline className="w-full h-full object-cover" />
+
+      {/* Fullscreen toggle button (hover to reveal) */}
+      <button
+        onClick={toggleFullscreen}
+        className="absolute bottom-20 right-6 z-10 p-2 bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-lg text-white/50 hover:text-white/80 transition-all opacity-0 hover:opacity-100"
+        title={isFullscreen ? "退出全屏" : "全屏"}
+      >
+        {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+      </button>
+
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10">
           <Loader2 className="w-20 h-20 text-amber-500 animate-spin mb-6" />
@@ -72,7 +103,7 @@ export default function TVPlayer({ channel }: TVPlayerProps) {
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
           <span className="text-8xl mb-8">📺</span>
           <p className="text-white text-3xl font-bold mb-3">欢迎使用电视直播</p>
-          <p className="text-neutral-400 text-xl">按 OK 打开菜单 · ↓ 换台</p>
+          <p className="text-neutral-400 text-xl">↑↓ 换台 · ←→ 切分类 · Menu 设置</p>
         </div>
       )}
     </div>

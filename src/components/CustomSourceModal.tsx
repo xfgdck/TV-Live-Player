@@ -12,7 +12,11 @@ import {
   AlertCircle, 
   Bookmark, 
   Shuffle, 
-  Play 
+  Play,
+  ChevronUp,
+  ChevronDown,
+  Pencil,
+  List
 } from "lucide-react";
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { DEFAULT_PLAYLIST_SOURCES } from "../data/defaultChannels";
@@ -29,6 +33,11 @@ interface CustomSourceModalProps {
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   channels: TVChannel[];
   onDeleteCategory: (category: string) => void;
+  onRenameCategory: (oldName: string, newName: string) => void;
+  onDeleteChannel: (id: string) => void;
+  onMoveChannelUp: (id: string) => void;
+  onMoveChannelDown: (id: string) => void;
+  onRenameChannel: (id: string, newName: string) => void;
   onFactoryReset: () => void;
 }
 
@@ -42,16 +51,21 @@ export default function CustomSourceModal({
   onImport,
   channels,
   onDeleteCategory,
+  onRenameCategory,
+  onDeleteChannel,
+  onMoveChannelUp,
+  onMoveChannelDown,
+  onRenameChannel,
   onFactoryReset,
 }: CustomSourceModalProps) {
-  const [activeTab, setActiveTab] = useState<"m3u" | "single" | "manage" | "backup">("m3u");
+  const [activeTab, setActiveTab] = useState<"m3u" | "single" | "channels" | "manage" | "backup">("m3u");
   const [m3uName, setM3uName] = useState<string>("");
   const [m3uUrl, setM3uUrl] = useState<string>("");
   const [isParsing, setIsParsing] = useState<boolean>(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
 
-  // Pasta & upload M3U states
+  // Paste & upload M3U states
   const [pastedM3uText, setPastedM3uText] = useState<string>("");
   const [pastedM3uName, setPastedM3uName] = useState<string>("");
 
@@ -60,6 +74,13 @@ export default function CustomSourceModal({
   const [singleUrl, setSingleUrl] = useState<string>("");
   const [singleCategory, setSingleCategory] = useState<string>("我的自定义");
   const [singleLogo, setSingleLogo] = useState<string>("");
+
+  // Channel management search/filter
+  const [chFilter, setChFilter] = useState<string>("");
+
+  // Editing state for category rename
+  const [editingCat, setEditingCat] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState<string>("");
 
   // Parse custom M3U playlist locally entirely (client-side)
   const handleParseM3u = async (urlToParse?: string, nameToParse?: string) => {
@@ -191,14 +212,14 @@ export default function CustomSourceModal({
 
         const parsedChannels = parseM3uPlaylist(m3uText);
         if (!parsedChannels || parsedChannels.length === 0) {
-          throw new Error("该 M3U 文件的格式可能不正确，未能解析出有效的直播频道频道列表。");
+          throw new Error("该 M3U 文件的格式可能不正确，未能解析出有效的直播频道列表。");
         }
 
         const fileName = file.name.replace(/\.[^/.]+$/, ""); // strip extension
         const virtualUrl = `local_file_${Date.now()}_${file.name}`;
         onAddChannels(parsedChannels, fileName, virtualUrl);
 
-        setParseSuccessMsg(`✓ 成功从本地文件 [${file.name}] 导入了 ${parsedChannels.length} 个本地电视频道！`);
+        setParseSuccessMsg(`✓ 成功从本地文件 [${file.name}] 导入了 ${parsedChannels.length} 个电视频道！`);
       } catch (err: any) {
         setParseError(err.message || "读取或解析本地 M3U 文件出错。");
       }
@@ -230,7 +251,39 @@ export default function CustomSourceModal({
     setSingleName("");
     setSingleUrl("");
     setSingleLogo("");
-    alert("手工频道添加成功！已放入类别：“" + newChannel.category + "”中。");
+    alert("手工频道添加成功！已放入类别：" + newChannel.category + " 中。");
+  };
+
+  // Category management
+  const catMap = (() => {
+    const m = new Map<string, number>();
+    channels.forEach(c => { m.set(c.category, (m.get(c.category) || 0) + 1); });
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  })();
+
+  const handleRenameCategory = (oldName: string) => {
+    setEditingCat(oldName);
+    setEditingCatName(oldName);
+  };
+
+  const submitRenameCategory = () => {
+    if (editingCat && editingCatName.trim() && editingCatName.trim() !== editingCat) {
+      onRenameCategory(editingCat, editingCatName.trim());
+    }
+    setEditingCat(null);
+    setEditingCatName("");
+  };
+
+  // Channel management
+  const filteredChs = chFilter.trim()
+    ? channels.filter(c => c.name.toLowerCase().includes(chFilter.toLowerCase()) || c.category.toLowerCase().includes(chFilter.toLowerCase()))
+    : channels;
+
+  const handleRenameChannel = (ch: TVChannel) => {
+    const newName = prompt("重命名频道：", ch.name);
+    if (newName && newName.trim() && newName.trim() !== ch.name) {
+      onRenameChannel(ch.id, newName.trim());
+    }
   };
 
   return (
@@ -244,8 +297,8 @@ export default function CustomSourceModal({
           <div className="flex items-center gap-3">
             <Globe className="w-6 h-6 text-amber-500" />
             <div>
-              <h2 className="text-xl font-serif font-bold tracking-tight text-white">自定义直播源管理</h2>
-              <p className="text-neutral-400 text-xs">自定义扩展、订阅 M3U 播放源，极速备份</p>
+              <h2 className="text-xl font-serif font-bold tracking-tight text-white">设置中心</h2>
+              <p className="text-neutral-400 text-xs">直播源 · 频道管理 · 分类编辑 · 备份恢复</p>
             </div>
           </div>
           <button 
@@ -258,54 +311,62 @@ export default function CustomSourceModal({
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b border-neutral-800 bg-neutral-950/50 p-1">
+        <div className="flex border-b border-neutral-800 bg-neutral-950/50 p-1 overflow-x-auto">
           <button
             id="tab_m3u"
             onClick={() => setActiveTab("m3u")}
-            className={`flex-1 py-3 text-sm font-medium transition-all rounded-xl ${
+            className={`flex-1 py-2.5 text-xs font-medium transition-all rounded-xl whitespace-nowrap ${
               activeTab === "m3u" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            订阅 M3U 播放列表
+            订阅 M3U
           </button>
           <button
             id="tab_single"
             onClick={() => setActiveTab("single")}
-            className={`flex-1 py-3 text-sm font-medium transition-all rounded-xl ${
+            className={`flex-1 py-2.5 text-xs font-medium transition-all rounded-xl whitespace-nowrap ${
               activeTab === "single" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            手动添加单台
+            手动添加
+          </button>
+          <button
+            id="tab_channels"
+            onClick={() => setActiveTab("channels")}
+            className={`flex-1 py-2.5 text-xs font-medium transition-all rounded-xl whitespace-nowrap flex items-center justify-center gap-1 ${
+              activeTab === "channels" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            <List className="w-3 h-3" />
+            频道管理
+            <span className="bg-amber-500 text-neutral-950 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
+              {channels.length}
+            </span>
           </button>
           <button
             id="tab_manage"
             onClick={() => setActiveTab("manage")}
-            className={`flex-1 py-3 text-sm font-medium transition-all rounded-xl flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 text-xs font-medium transition-all rounded-xl whitespace-nowrap ${
               activeTab === "manage" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            管理当前订阅
-            {customSources.length > 0 && (
-              <span className="bg-amber-500 text-neutral-950 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                {customSources.length}
-              </span>
-            )}
+            订阅源与分类
           </button>
           <button
             id="tab_backup"
             onClick={() => setActiveTab("backup")}
-            className={`flex-1 py-3 text-sm font-medium transition-all rounded-xl ${
+            className={`flex-1 py-2.5 text-xs font-medium transition-all rounded-xl whitespace-nowrap ${
               activeTab === "backup" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            备份与恢复
+            备份恢复
           </button>
         </div>
 
         {/* Modal Scroll Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* TAP 1: ADD M3U PLAYLIST */}
+          {/* TAB 1: ADD M3U PLAYLIST */}
           {activeTab === "m3u" && (
             <div className="space-y-6">
               <div className="space-y-2">
@@ -474,7 +535,7 @@ export default function CustomSourceModal({
             </div>
           )}
 
-          {/* TAP 2: ADD SINGLE CHANNEL MANUALLY */}
+          {/* TAB 2: ADD SINGLE CHANNEL MANUALLY */}
           {activeTab === "single" && (
             <form onSubmit={handleAddSingle} className="space-y-4">
               <p className="text-neutral-400 text-xs mb-2">
@@ -547,7 +608,92 @@ export default function CustomSourceModal({
             </form>
           )}
 
-          {/* TAB 3: MANAGE CURRENT SUBSCRIPTIONS */}
+          {/* TAB 3: CHANNEL MANAGEMENT */}
+          {activeTab === "channels" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-neutral-300">
+                  频道列表
+                  <span className="text-neutral-500 text-xs ml-2">共 {channels.length} 个</span>
+                </h3>
+              </div>
+
+              {/* Search filter */}
+              <input
+                type="text"
+                placeholder="搜索频道名称或分类..."
+                value={chFilter}
+                onChange={(e) => setChFilter(e.target.value)}
+                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-xs focus:outline-none placeholder:text-neutral-500"
+              />
+
+              {filteredChs.length === 0 ? (
+                <div className="text-center py-8 bg-neutral-950/50 rounded-2xl border border-neutral-800 border-dashed">
+                  <Bookmark className="w-10 h-10 text-neutral-600 mx-auto mb-2" />
+                  <p className="text-neutral-400 text-sm">暂无频道</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredChs.map((ch, i) => {
+                    const idx = channels.findIndex(c => c.id === ch.id);
+                    const canUp = idx > 0;
+                    const canDown = idx >= 0 && idx < channels.length - 1;
+                    return (
+                      <div key={ch.id} className="flex items-center gap-2 px-3 py-2 bg-neutral-950 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-colors">
+                        {/* Logo / icon */}
+                        {ch.logo
+                          ? <img src={ch.logo} alt="" referrerPolicy="no-referrer" className="w-6 h-6 object-contain rounded shrink-0 bg-black/50" onError={e => { (e.target as HTMLElement).style.display = "none"; }} />
+                          : <span className="text-sm shrink-0">📺</span>
+                        }
+                        
+                        {/* Name + Category */}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium text-white truncate">{ch.name}</div>
+                          <div className="text-[10px] text-neutral-500 truncate">{ch.category}</div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            onClick={() => handleRenameChannel(ch)}
+                            className="p-1.5 text-neutral-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
+                            title="重命名"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onMoveChannelUp(ch.id)}
+                            disabled={!canUp}
+                            className={`p-1.5 rounded-lg transition-colors ${canUp ? "text-neutral-400 hover:text-amber-400 hover:bg-amber-500/10" : "text-white/10"}`}
+                            title="上移"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onMoveChannelDown(ch.id)}
+                            disabled={!canDown}
+                            className={`p-1.5 rounded-lg transition-colors ${canDown ? "text-neutral-400 hover:text-amber-400 hover:bg-amber-500/10" : "text-white/10"}`}
+                            title="下移"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteChannel(ch.id)}
+                            className="p-1.5 text-neutral-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors ml-0.5 pl-1.5 border-l border-white/10"
+                            title="删除"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: SOURCE & CATEGORY MANAGEMENT */}
           {activeTab === "manage" && (
             <div className="space-y-6">
               {/* Sources */}
@@ -582,37 +728,54 @@ export default function CustomSourceModal({
               {/* Categories */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-neutral-300">分类管理</h3>
-                {(function() {
-                  const catMap = new Map<string, number>();
-                  channels.forEach(c => { catMap.set(c.category, (catMap.get(c.category) || 0) + 1); });
-                  const cats = Array.from(catMap.entries()).sort((a, b) => b[1] - a[1]);
-                  return (
-                    <div className="space-y-1.5">
-                      {cats.map(([cat, count]) => {
-                        const isSpecial = cat === "全部" || cat === "收藏";
-                        return (
-                          <div key={cat} className="flex items-center justify-between px-4 py-2.5 bg-neutral-950 rounded-xl border border-neutral-800">
-                            <div className="flex items-center gap-3">
-                              <span className="text-base">📂</span>
-                              <div>
-                                <span className="text-sm text-white font-medium">{cat}</span>
-                                <span className="text-xs text-neutral-500 ml-2">{count} 个频道</span>
-                              </div>
+                <div className="space-y-1.5">
+                  {catMap.map(([cat, count]) => {
+                    const isSpecial = cat === "全部" || cat === "收藏";
+                    const isEditing = editingCat === cat;
+                    return (
+                      <div key={cat} className="flex items-center justify-between px-4 py-2.5 bg-neutral-950 rounded-xl border border-neutral-800">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="text-base shrink-0">📂</span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <input
+                                type="text"
+                                value={editingCatName}
+                                onChange={(e) => setEditingCatName(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") submitRenameCategory(); if (e.key === "Escape") setEditingCat(null); }}
+                                className="bg-neutral-900 border border-amber-500 rounded-lg px-2 py-1 text-sm text-white focus:outline-none min-w-0 flex-1"
+                                autoFocus
+                              />
+                              <button onClick={submitRenameCategory} className="text-emerald-400 hover:text-emerald-300 text-xs px-2 py-1 bg-emerald-500/10 rounded">✓</button>
+                              <button onClick={() => setEditingCat(null)} className="text-neutral-400 hover:text-neutral-300 text-xs px-2 py-1 bg-neutral-800 rounded">✕</button>
                             </div>
-                            {isSpecial ? (
-                              <span className="text-[10px] text-neutral-600 bg-neutral-900 px-2 py-1 rounded">系统</span>
-                            ) : (
-                              <button onClick={() => onDeleteCategory(cat)}
-                                className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors">
-                                删除
-                              </button>
-                            )}
+                          ) : (
+                            <div className="min-w-0">
+                              <span className="text-sm text-white font-medium">{cat}</span>
+                              <span className="text-xs text-neutral-500 ml-2">{count} 个频道</span>
+                            </div>
+                          )}
+                        </div>
+                        {isSpecial ? (
+                          <span className="text-[10px] text-neutral-600 bg-neutral-900 px-2 py-1 rounded shrink-0">系统</span>
+                        ) : (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => handleRenameCategory(cat)}
+                              className="text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-2 py-1 rounded-lg transition-colors"
+                              title="重命名">
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button onClick={() => onDeleteCategory(cat)}
+                              className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded-lg transition-colors"
+                              title="删除">
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Factory Reset */}
@@ -628,7 +791,7 @@ export default function CustomSourceModal({
             </div>
           )}
 
-          {/* TAP 4: BACKUP & RESTORE */}
+          {/* TAB 5: BACKUP & RESTORE */}
           {activeTab === "backup" && (
             <div className="space-y-6">
               <div className="space-y-2">
@@ -689,9 +852,9 @@ export default function CustomSourceModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-neutral-950 border-t border-neutral-850 flex items-center justify-between text-neutral-500 text-[11px] font-mono">
-          <span>TV Live Player - Custom Source Module</span>
-          <span className="text-neutral-400">支持 HLS m3u8 标准直播流</span>
+        <div className="p-4 bg-neutral-950 border-t border-neutral-850 flex items-center justify-between text-neutral-500 text-[11px] font-mono">
+          <span>按 Back 键关闭设置</span>
+          <span className="text-neutral-400">{channels.length} 个频道 · {catMap.length} 个分类</span>
         </div>
       </div>
     </div>

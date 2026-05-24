@@ -3,9 +3,9 @@ import { TVChannel, CustomSource } from "./types";
 import { INITIAL_DEFAULT_CHANNELS } from "./data/defaultChannels";
 import TVPlayer from "./components/TVPlayer";
 import CustomSourceModal from "./components/CustomSourceModal";
-import { Heart, ChevronUp, ChevronDown, Trash2, Settings, Tv, X } from "lucide-react";
+import { Heart, Settings, Tv } from "lucide-react";
 
-type FocusZone = "watching" | "overlay" | "categories" | "channels";
+type FocusZone = "watching" | "categories";
 
 export default function App() {
   const [channels, setChannels] = useState<TVChannel[]>([]);
@@ -15,16 +15,23 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState("全部");
 
   const [focusZone, setFocusZone] = useState<FocusZone>("watching");
-  const [focusCatIdx, setFocusCatIdx] = useState(0);
-  const [focusChIdx, setFocusChIdx] = useState(0);
-  const [opsIdx, setOpsIdx] = useState(-1); // -1=not in ops, 0=⬆, 1=⬇, 2=🗑
+  const [catPickerIdx, setCatPickerIdx] = useState(0);
 
   const [showSourceModal, setShowSourceModal] = useState(false);
+
+  // OSD info display (triggered by OK press in watching)
+  const [showOsdInfo, setShowOsdInfo] = useState(false);
+  const osdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Category picker auto-hide timer
+  const catPickerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Exit prompt
   const [exitPrompt, setExitPrompt] = useState(false);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const osdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Video element ref for fullscreen
+  const videoContainerRef = useRef<HTMLDivElement | null>(null);
 
   // ─── load / save ───
   const load = <T,>(key: string, fallback: T): T => {
@@ -44,21 +51,9 @@ export default function App() {
     setSelectedChannel(lastCh || chs[0] || null);
   }, []);
 
-  // ─── Save last channel on every switch ───
-  const switchToChannel = useCallback((ch: TVChannel) => {
-    setSelectedChannel(ch);
-    localStorage.setItem("tv_last_channel", ch.id);
-    setFocusZone("watching");
-  }, []);
-
-  // Persist channels to localStorage whenever they change
-  useEffect(() => {
-    save("tv_channels", channels);
-  }, [channels]);
-
-  useEffect(() => {
-    save("tv_sources", customSources);
-  }, [customSources]);
+  // ─── Persist channels to localStorage whenever they change ───
+  useEffect(() => { save("tv_channels", channels); }, [channels]);
+  useEffect(() => { save("tv_sources", customSources); }, [customSources]);
 
   // ─── Categories ───
   const catList = useMemo(() => {
@@ -77,36 +72,89 @@ export default function App() {
     });
   }, [channels, selectedCategory, favorites]);
 
-  // ─── Clamp indices ───
-  useEffect(() => {
-    if (focusCatIdx >= catList.length) setFocusCatIdx(Math.max(0, catList.length - 1));
-  }, [catList, focusCatIdx]);
-  useEffect(() => {
-    if (focusChIdx >= filteredChannels.length) setFocusChIdx(Math.max(0, filteredChannels.length - 1));
-    if (opsIdx >= 0 && opsIdx >= 3) setOpsIdx(2);
-  }, [filteredChannels, focusChIdx, opsIdx]);
+  // ─── Save last channel on every switch ───
+  const switchToChannel = useCallback((ch: TVChannel) => {
+    setSelectedChannel(ch);
+    localStorage.setItem("tv_last_channel", ch.id);
+    setFocusZone("watching");
+    // Request fullscreen on channel switch
+    requestFullscreen();
+  }, []);
 
-  useEffect(() => {
-    if (focusZone === "channels" && opsIdx < 0) {
-      document.getElementById(`ch-${focusChIdx}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [focusZone, focusChIdx, opsIdx]);
-
-  // ─── OSD ───
-  const showOsd = () => {
-    setFocusZone("overlay");
-    if (osdTimer.current) clearTimeout(osdTimer.current);
-    osdTimer.current = setTimeout(() => { setFocusZone(p => p === "overlay" ? "watching" : p); }, 5000);
+  const requestFullscreen = () => {
+    try {
+      const el = videoContainerRef.current;
+      if (el && document.fullscreenElement === null) {
+        el.requestFullscreen?.().catch(() => {});
+      }
+    } catch {}
   };
-  const hideOsd = () => { setFocusZone("watching"); if (osdTimer.current) clearTimeout(osdTimer.current); };
+
+  // ─── Switch to prev/next channel in current filtered list ───
+  const switchToPrevChannel = useCallback(() => {
+    if (!selectedChannel) return;
+    const idx = filteredChannels.findIndex(c => c.id === selectedChannel.id);
+    if (idx < 0) { switchToChannel(filteredChannels[0]); return; }
+    const prev = idx > 0 ? filteredChannels[idx - 1] : filteredChannels[filteredChannels.length - 1];
+    switchToChannel(prev);
+  }, [selectedChannel, filteredChannels, switchToChannel]);
+
+  const switchToNextChannel = useCallback(() => {
+    if (!selectedChannel) return;
+    const idx = filteredChannels.findIndex(c => c.id === selectedChannel.id);
+    if (idx < 0) { switchToChannel(filteredChannels[0]); return; }
+    const next = idx < filteredChannels.length - 1 ? filteredChannels[idx + 1] : filteredChannels[0];
+    switchToChannel(next);
+  }, [selectedChannel, filteredChannels, switchToChannel]);
+
+  // ─── OSD Info ───
+  const showInfo = () => {
+    setShowOsdInfo(true);
+    if (osdTimer.current) clearTimeout(osdTimer.current);
+    osdTimer.current = setTimeout(() => setShowOsdInfo(false), 3000);
+  };
+
+  // ─── Category Picker ───
+  const showCatPicker = (direction: "left" | "right") => {
+    setFocusZone("categories");
+    const curCatIdx = catList.indexOf(selectedCategory);
+    const startIdx = curCatIdx >= 0 ? curCatIdx : 0;
+    if (direction === "left") {
+      setCatPickerIdx(startIdx > 0 ? startIdx - 1 : catList.length - 1);
+    } else {
+      setCatPickerIdx(startIdx < catList.length - 1 ? startIdx + 1 : 0);
+    }
+    // Auto-hide after 4 seconds
+    if (catPickerTimer.current) clearTimeout(catPickerTimer.current);
+    catPickerTimer.current = setTimeout(() => setFocusZone("watching"), 4000);
+  };
+
+  const dismissCatPicker = () => {
+    setFocusZone("watching");
+    if (catPickerTimer.current) clearTimeout(catPickerTimer.current);
+  };
+
+  const confirmCategory = () => {
+    const cat = catList[catPickerIdx];
+    if (!cat) { dismissCatPicker(); return; }
+    setSelectedCategory(cat);
+    // Switch to first channel in new category
+    const newFiltered = channels.filter(c => {
+      if (cat === "收藏") return favorites.includes(c.id);
+      if (cat !== "全部") return c.category === cat;
+      return true;
+    });
+    if (newFiltered.length > 0) {
+      switchToChannel(newFiltered[0]);
+    }
+    dismissCatPicker();
+  };
 
   // ─── Exit ───
   const handleExitBack = () => {
     if (exitPrompt) {
-      // Second press: save & close
       localStorage.setItem("tv_last_channel", selectedChannel?.id || "");
       if (exitTimer.current) clearTimeout(exitTimer.current);
-      // WebView exit: go back in history to close
       if (window.history.length > 1) window.history.back();
       else (window as any).close?.();
     } else {
@@ -121,7 +169,7 @@ export default function App() {
     setFavorites(next); save("tv_favorites", next);
   };
 
-  // ─── Delete channel ───
+  // ─── Channel operations (for settings modal) ───
   const delChannel = (id: string) => {
     const ch = channels.find(c => c.id === id);
     if (!ch || !window.confirm(`确定要删除「${ch.name}」吗？`)) return;
@@ -129,21 +177,33 @@ export default function App() {
     setChannels(next);
     if (selectedChannel?.id === id) setSelectedChannel(next[0] || null);
     if (favorites.includes(id)) { const f = favorites.filter(x => x !== id); setFavorites(f); save("tv_favorites", f); }
-    setOpsIdx(-1);
   };
 
-  // ─── Move ───
-  const moveChannel = (dir: "up" | "down") => {
-    if (focusZone !== "channels" || opsIdx < 0) return;
-    const f = filteredChannels[focusChIdx];
-    if (!f) return;
-    const idx = channels.findIndex(c => c.id === f.id);
-    if (idx < 0) return;
-    const t = dir === "up" ? idx - 1 : idx + 1;
-    if (t < 0 || t >= channels.length) return;
+  const moveChannelUp = (id: string) => {
+    const idx = channels.findIndex(c => c.id === id);
+    if (idx <= 0) return;
     const next = [...channels];
-    [next[idx], next[t]] = [next[t], next[idx]];
+    [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
     setChannels(next);
+  };
+
+  const moveChannelDown = (id: string) => {
+    const idx = channels.findIndex(c => c.id === id);
+    if (idx < 0 || idx >= channels.length - 1) return;
+    const next = [...channels];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    setChannels(next);
+  };
+
+  const renameChannel = (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    setChannels(prev => prev.map(c => c.id === id ? { ...c, name: newName.trim() } : c));
+  };
+
+  const renameCategory = (oldName: string, newName: string) => {
+    if (!newName.trim() || oldName === newName.trim()) return;
+    if (oldName === "全部" || oldName === "收藏") return;
+    setChannels(prev => prev.map(c => c.category === oldName ? { ...c, category: newName.trim() } : c));
   };
 
   // ─── Add / Remove sources ───
@@ -171,7 +231,6 @@ export default function App() {
     });
   };
 
-  // ─── Delete category ───
   const delCategory = (cat: string) => {
     if (cat === "全部" || cat === "收藏") return;
     const victims = channels.filter(c => c.category === cat);
@@ -182,9 +241,9 @@ export default function App() {
       if (selectedChannel && selectedChannel.category === cat) setSelectedChannel(next[0] || null);
       return next;
     });
+    if (selectedCategory === cat) setSelectedCategory("全部");
   };
 
-  // ─── Factory reset ───
   const factoryReset = () => {
     if (!window.confirm("确定恢复出厂设置？所有自定义数据将被清除。")) return;
     ["tv_channels", "tv_favorites", "tv_sources", "tv_last_channel"].forEach(k => localStorage.removeItem(k));
@@ -215,7 +274,7 @@ export default function App() {
   };
 
   // ═══════════════════════════════════════
-  // D-PAD
+  // D-PAD / KEY HANDLER
   // ═══════════════════════════════════════
   const handleKey = useCallback((action: string) => {
     if (showSourceModal) return;
@@ -226,65 +285,28 @@ export default function App() {
 
     // ── WATCHING ──
     if (focusZone === "watching") {
-      if (action === "Enter") { showOsd(); return; }
+      if (action === "ArrowUp") { switchToPrevChannel(); return; }
+      if (action === "ArrowDown") { switchToNextChannel(); return; }
+      if (action === "ArrowLeft") { showCatPicker("left"); return; }
+      if (action === "ArrowRight") { showCatPicker("right"); return; }
+      if (action === "Enter" || action === "OK") { showInfo(); return; }
       if (action === "Backspace") { handleExitBack(); return; }
-      return; // ↑↓←→ do nothing in pure watching
+      return;
     }
 
-    // ── OVERLAY ──
-    if (focusZone === "overlay") {
-      if (action === "Enter") { setShowSourceModal(true); return; }
-      if (action === "Backspace") { hideOsd(); return; }
-      return; // ↑↓←→ do nothing in OSD
-    }
-
-    // ── CATEGORIES ──
+    // ── CATEGORY PICKER ──
     if (focusZone === "categories") {
-      if (action === "ArrowLeft") { setFocusCatIdx(i => i > 0 ? i - 1 : catList.length - 1); return; }
-      if (action === "ArrowRight") { setFocusCatIdx(i => i < catList.length - 1 ? i + 1 : 0); return; }
-      if (action === "ArrowDown") { setFocusZone("channels"); setFocusChIdx(0); setOpsIdx(-1); return; }
-      if (action === "ArrowUp" || action === "Backspace") { setFocusZone("watching"); return; }
-      if (action === "Enter") {
-        setSelectedCategory(catList[focusCatIdx] || "全部");
-        setFocusZone("channels"); setFocusChIdx(0); setOpsIdx(-1);
-        return;
-      }
+      if (action === "ArrowLeft") { setCatPickerIdx(i => i > 0 ? i - 1 : catList.length - 1); return; }
+      if (action === "ArrowRight") { setCatPickerIdx(i => i < catList.length - 1 ? i + 1 : 0); return; }
+      if (action === "Enter" || action === "OK") { confirmCategory(); return; }
+      if (action === "ArrowUp") { dismissCatPicker(); switchToPrevChannel(); return; }
+      if (action === "ArrowDown") { dismissCatPicker(); switchToNextChannel(); return; }
+      if (action === "Backspace") { dismissCatPicker(); return; }
       return;
     }
+  }, [focusZone, catPickerIdx, catList, selectedChannel, filteredChannels, showSourceModal, exitPrompt]);
 
-    // ── CHANNELS ──
-    if (focusZone === "channels") {
-      // If in operations sub-mode
-      if (opsIdx >= 0) {
-        if (action === "ArrowUp" || action === "ArrowDown") { setOpsIdx(-1); return; }
-        if (action === "ArrowLeft") { setOpsIdx(i => i > 0 ? i - 1 : 2); return; }
-        if (action === "ArrowRight") { setOpsIdx(i => i < 2 ? i + 1 : 0); return; }
-        if (action === "Enter") {
-          if (opsIdx === 0) moveChannel("up");
-          else if (opsIdx === 1) moveChannel("down");
-          else if (opsIdx === 2) delChannel(filteredChannels[focusChIdx]?.id || "");
-          return;
-        }
-        if (action === "Backspace") { setOpsIdx(-1); return; }
-        return;
-      }
-
-      // Channel list navigation
-      if (action === "ArrowUp") { setFocusChIdx(i => Math.max(0, i - 1)); return; }
-      if (action === "ArrowDown") { setFocusChIdx(i => Math.min(filteredChannels.length - 1, i + 1)); return; }
-      if (action === "ArrowLeft") { setFocusZone("categories"); setFocusCatIdx(catList.indexOf(selectedCategory)); return; }
-      if (action === "ArrowRight") { setOpsIdx(0); return; } // Enter operations area
-      if (action === "Enter") {
-        const ch = filteredChannels[focusChIdx];
-        if (ch) switchToChannel(ch);
-        return;
-      }
-      if (action === "Backspace") { setFocusZone("watching"); return; }
-      return;
-    }
-  }, [focusZone, focusCatIdx, focusChIdx, opsIdx, catList, filteredChannels, selectedChannel, selectedCategory, showSourceModal, exitPrompt]);
-
-  // ─── Keyboard ───
+  // ─── Keyboard listener ───
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (showSourceModal) return;
@@ -293,7 +315,6 @@ export default function App() {
         ArrowUp: "ArrowUp", ArrowDown: "ArrowDown", ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight",
         Enter: "Enter", " ": "Menu", Backspace: "Backspace", Escape: "Backspace",
       };
-      // Map M/m or context menu key to Menu action
       if (e.key === "m" || e.key === "M" || e.key === "ContextMenu") return handleKey("Menu");
       if (map[e.key]) handleKey(map[e.key]);
     };
@@ -301,14 +322,35 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleKey, showSourceModal]);
 
-  const showAnyOverlay = focusZone === "overlay" || focusZone === "categories" || focusZone === "channels";
-  const focusRing = "outline-3 outline-amber-500 outline-offset-1 outline";
+  // ─── Request fullscreen on first user interaction ───
+  useEffect(() => {
+    const handler = () => {
+      requestFullscreen();
+      window.removeEventListener("click", handler);
+      window.removeEventListener("keydown", handler);
+    };
+    window.addEventListener("click", handler);
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("click", handler);
+      window.removeEventListener("keydown", handler);
+    };
+  }, []);
+
+  // ─── Keep focus on category picker timer reset ───
+  useEffect(() => {
+    if (focusZone === "categories") {
+      if (catPickerTimer.current) clearTimeout(catPickerTimer.current);
+      catPickerTimer.current = setTimeout(() => setFocusZone("watching"), 4000);
+    }
+    return () => { if (catPickerTimer.current) clearTimeout(catPickerTimer.current); };
+  }, [focusZone, catPickerIdx]);
 
   // ═══════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════
   return (
-    <div className="w-screen h-screen bg-black text-white font-sans overflow-hidden select-none relative">
+    <div ref={videoContainerRef} className="w-screen h-screen bg-black text-white font-sans overflow-hidden select-none relative">
 
       {/* ── LAYER 0: Fullscreen video ── */}
       <TVPlayer channel={selectedChannel} />
@@ -323,8 +365,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── LAYER 1: OSD ── */}
-      <div className={`absolute inset-0 z-10 pointer-events-none transition-opacity duration-300 ${showAnyOverlay ? "opacity-100" : "opacity-0"}`}>
+      {/* ── LAYER 1: OSD Info (shown on OK press, auto-hides) ── */}
+      <div className={`absolute inset-0 z-10 pointer-events-none transition-opacity duration-300 ${showOsdInfo ? "opacity-100" : "opacity-0"}`}>
         {/* Logo top-left */}
         <div className="absolute top-6 left-6 flex items-center gap-3 bg-black/50 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10">
           <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
@@ -333,12 +375,10 @@ export default function App() {
           <span className="text-white/90 text-base font-bold tracking-wide">万能电视直播</span>
         </div>
 
-        {/* Settings gear — focusable in overlay mode */}
+        {/* Settings gear — always clickable */}
         <button
           onClick={() => setShowSourceModal(true)}
-          className={`absolute top-6 right-6 pointer-events-auto p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-xl border transition-all ${
-            focusZone === "overlay" ? "border-amber-500 text-amber-400 scale-110" : "border-white/10 text-white/60 hover:text-amber-400"
-          }`}
+          className="absolute top-6 right-6 pointer-events-auto p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-xl border border-white/10 text-white/60 hover:text-amber-400 transition-all"
         >
           <Settings className="w-6 h-6" />
         </button>
@@ -347,38 +387,40 @@ export default function App() {
         {selectedChannel && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-8 pt-14 pb-6">
             <div className="flex items-center gap-4">
-              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <div>
                 <div className="text-white text-lg font-bold">{selectedChannel.name}</div>
                 <div className="text-white/40 text-sm">{selectedChannel.category}</div>
               </div>
               <div className="flex-1" />
               <div className="flex items-center gap-3 text-white/30 text-sm">
-                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">↓</span>换台</span>
-                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">← →</span>切分类</span>
-                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">OK</span>设置</span>
+                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">↑↓</span>换台</span>
+                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">←→</span>切分类</span>
+                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">OK</span>确认</span>
                 <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">Menu</span>设置</span>
-                <span className="flex items-center gap-1"><span className="px-2 py-0.5 bg-white/10 rounded text-xs">Back</span>关菜单</span>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── LAYER 2: Category selector ── */}
-      {(focusZone === "categories" || focusZone === "channels") && (
-        <div className="absolute top-24 left-6 right-20 z-20">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar bg-black/70 backdrop-blur-xl p-2.5 rounded-2xl border border-white/5">
+      {/* ── LAYER 2: Category Picker (shown on Left/Right press) ── */}
+      <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 z-20 transition-all duration-300 ${
+        focusZone === "categories" ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-8 pointer-events-none"
+      }`}>
+        <div className="bg-black/85 backdrop-blur-xl px-6 py-4 rounded-3xl border border-white/15 shadow-2xl">
+          <p className="text-white/40 text-xs text-center mb-3">← → 选择分类 · OK 确认 · ↑↓ 取消</p>
+          <div className="flex gap-2 items-center">
             {catList.map((cat, i) => {
               const sel = selectedCategory === cat;
-              const foc = focusZone === "categories" && focusCatIdx === i;
+              const foc = focusZone === "categories" && catPickerIdx === i;
               return (
                 <button
                   key={cat}
-                  onClick={() => { if (focusZone === "categories") { setSelectedCategory(cat); setFocusZone("channels"); setFocusChIdx(0); setOpsIdx(-1); } }}
+                  onClick={() => { setCatPickerIdx(i); }}
                   className={`shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                    sel ? "bg-amber-600 text-black" : "bg-white/10 text-white/80"
-                  } ${foc ? `${focusRing} scale-105 z-10` : ""}`}
+                    sel ? "bg-amber-600 text-black" : "bg-white/10 text-white/70"
+                  } ${foc ? "outline-3 outline-amber-400 outline-offset-1 outline scale-110 z-10" : ""}`}
                 >
                   {cat === "收藏" && <Heart className="w-3 h-3 inline mr-1 fill-rose-500 text-rose-500" />}
                   {cat}
@@ -387,95 +429,25 @@ export default function App() {
             })}
           </div>
         </div>
-      )}
-
-      {/* ── LAYER 3: Channel panel (right) ── */}
-      <div className={`absolute right-0 top-0 bottom-0 w-[35%] min-w-[300px] bg-black/85 backdrop-blur-xl border-l border-white/10 z-20 transition-transform duration-300 flex flex-col ${
-        focusZone === "channels" ? "translate-x-0" : "translate-x-full"
-      }`}>
-        <div className="shrink-0 px-5 py-4 border-b border-white/10 flex items-center justify-between">
-          <div>
-            <div className="text-base font-bold text-white">{selectedCategory}</div>
-            <div className="text-xs text-white/40 mt-0.5">{filteredChannels.length} 个频道</div>
-          </div>
-          <button onClick={() => { setFocusZone("watching"); setOpsIdx(-1); }} className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1">
-          {filteredChannels.length === 0 ? (
-            <div className="text-center py-16 text-white/30 text-base">暂无频道</div>
-          ) : (
-            filteredChannels.map((ch, i) => {
-              const playing = selectedChannel?.id === ch.id;
-              const foc = focusZone === "channels" && focusChIdx === i && opsIdx < 0;
-              const inOps = focusZone === "channels" && focusChIdx === i && opsIdx >= 0;
-              const isFav = favorites.includes(ch.id);
-              const idx = channels.findIndex(c => c.id === ch.id);
-              const canUp = idx > 0;
-              const canDown = idx >= 0 && idx < channels.length - 1;
-
-              return (
-                <div key={ch.id} id={`ch-${i}`}
-                  onClick={() => switchToChannel(ch)}
-                  className={`px-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer transition-all border ${
-                    playing ? "bg-amber-600/15 border-amber-500/30" : "bg-white/5 border-transparent hover:bg-white/10"
-                  } ${foc ? `${focusRing} scale-[1.02] bg-white/15 border-amber-400 z-10` : ""}
-                  ${inOps ? "bg-white/10 border-amber-500/20" : ""}`}
-                >
-                  {ch.logo
-                    ? <img src={ch.logo} alt="" referrerPolicy="no-referrer" className="w-8 h-8 object-contain rounded bg-black/50 shrink-0" onError={e => { (e.target as HTMLElement).style.display = "none"; }} />
-                    : <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center text-lg shrink-0">📺</div>
-                  }
-                  <div className="min-w-0 flex-1">
-                    <div className={`text-sm font-semibold truncate ${playing ? "text-amber-400" : "text-white"}`}>{ch.name}</div>
-                    <div className="text-xs text-white/40 truncate">{ch.category}</div>
-                  </div>
-
-                  {/* Operation buttons — when this channel has ops focus */}
-                  {inOps && (
-                    <div className="flex items-center gap-0.5 shrink-0 animate-fade-in">
-                      <button onClick={e => { e.stopPropagation(); if (canUp) moveChannel("up"); }}
-                        disabled={!canUp}
-                        className={`p-2 rounded-lg ${opsIdx === 0 ? `${focusRing} scale-110` : ""} ${canUp ? "text-amber-400 hover:bg-amber-500/20" : "text-white/20"}`}
-                      ><ChevronUp className="w-4 h-4" /></button>
-                      <button onClick={e => { e.stopPropagation(); if (canDown) moveChannel("down"); }}
-                        disabled={!canDown}
-                        className={`p-2 rounded-lg ${opsIdx === 1 ? `${focusRing} scale-110` : ""} ${canDown ? "text-amber-400 hover:bg-amber-500/20" : "text-white/20"}`}
-                      ><ChevronDown className="w-4 h-4" /></button>
-                      <button onClick={e => { e.stopPropagation(); delChannel(ch.id); }}
-                        className={`p-2 rounded-lg ml-0.5 pl-1.5 border-l border-white/10 ${opsIdx === 2 ? `${focusRing} scale-110 text-red-300` : "text-red-400 hover:bg-red-500/20"}`}
-                      ><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  )}
-
-                  {/* Playing indicator */}
-                  {playing && !foc && !inOps && (
-                    <span className="text-xs text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full font-bold shrink-0">ON</span>
-                  )}
-
-                  {/* Favorite */}
-                  <button onClick={e => { e.stopPropagation(); toggleFav(ch.id); }}
-                    className={`p-1.5 rounded-lg shrink-0 ${isFav ? "text-rose-500" : "text-white/30 hover:text-rose-400"}`}>
-                    <Heart className={`w-4 h-4 ${isFav ? "fill-rose-500" : ""}`} />
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
       </div>
 
-      {/* ── LAYER 99: Source Modal ── */}
+      {/* ── LAYER 99: Settings Modal (Menu key) ── */}
       {showSourceModal && (
         <CustomSourceModal
-          onAddChannels={addChannels} onAddSingleChannel={addSingle}
-          customSources={customSources} onRemovePlaylist={delPlaylist}
+          onAddChannels={addChannels}
+          onAddSingleChannel={addSingle}
+          customSources={customSources}
+          onRemovePlaylist={delPlaylist}
           onClose={() => setShowSourceModal(false)}
-          onExport={exportState} onImport={importState}
+          onExport={exportState}
+          onImport={importState}
           channels={channels}
           onDeleteCategory={delCategory}
+          onRenameCategory={renameCategory}
+          onDeleteChannel={delChannel}
+          onMoveChannelUp={moveChannelUp}
+          onMoveChannelDown={moveChannelDown}
+          onRenameChannel={renameChannel}
           onFactoryReset={factoryReset}
         />
       )}
