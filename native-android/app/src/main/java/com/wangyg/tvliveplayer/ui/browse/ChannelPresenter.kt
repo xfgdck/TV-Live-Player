@@ -7,7 +7,9 @@ import android.widget.TextView
 import androidx.leanback.widget.Presenter
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.model.Channel
-import coil.load
+import coil3.load
+import coil3.request.crossfade
+import coil3.request.error
 
 class ChannelPresenter : Presenter() {
     class ViewHolder(view: ViewGroup) : Presenter.ViewHolder(view) {

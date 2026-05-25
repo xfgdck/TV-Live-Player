@@ -2,7 +2,7 @@ package com.wangyg.tvliveplayer.ui.browse
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.leanback.app.BrowseFragment as LeanbackBrowseFragment
+import androidx.leanback.app.BrowseSupportFragment as LeanbackBrowseFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow

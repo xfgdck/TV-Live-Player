@@ -9,8 +9,8 @@ import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.fragment.app.FragmentActivity
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.player.PlaybackState
 import com.wangyg.tvliveplayer.player.TVPlayer
@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class PlayerActivity : AppCompatActivity() {
+class PlayerActivity : FragmentActivity() {
 
     @Inject lateinit var tvPlayer: TVPlayer
     private val viewModel: PlayerViewModel by viewModels()

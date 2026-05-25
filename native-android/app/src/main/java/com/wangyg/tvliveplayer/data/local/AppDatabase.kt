@@ -9,7 +9,8 @@ import com.wangyg.tvliveplayer.data.local.entity.SourceEntity
 
 @Database(
     entities = [ChannelEntity::class, SourceEntity::class],
-    version = 1
+    version = 1,
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun channelDao(): ChannelDao

@@ -82,7 +82,8 @@ dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
 
     // Image Loading
-    implementation("io.coil-kt:coil:3.0.4")
+    implementation("io.coil-kt.coil3:coil:3.0.4")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

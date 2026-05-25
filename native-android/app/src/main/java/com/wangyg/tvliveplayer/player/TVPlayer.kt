@@ -35,9 +35,9 @@ class TVPlayer @Inject constructor(private val context: Context) {
     fun initialize(surfaceView: SurfaceView) {
         release()
         exoPlayer = ExoPlayer.Builder(context)
-            .setVideoSurfaceView(surfaceView)
             .build()
             .also { player ->
+                player.setVideoSurfaceView(surfaceView)
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         _playbackState.value = when (state) {
