@@ -11,7 +11,6 @@ import androidx.lifecycle.lifecycleScope
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import com.wangyg.tvliveplayer.parser.M3UParser
-import com.wangyg.tvliveplayer.data.repository.DefaultChannels
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

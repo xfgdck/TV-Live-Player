@@ -25,6 +25,8 @@
 
 **万能电视直播** 是一款面向 **Android TV（电视盒子）** 的纯客户端全屏电视直播应用，完全使用 **遥控器操控**。支持 HLS 直播流播放、M3U 订阅、频道管理、备份恢复等完整功能。
 
+> 🏗️ **项目背景**：最初使用 React 19 + Vite 6 + Capacitor 6（WebView）方案开发，但在 Android 6 设备上存在严重的 WebView 兼容性问题（白屏、HLS 播放不稳定、焦点管理差）。后**迁移至原生 Android（Kotlin）**，彻底解决了兼容性问题，并获得了更佳的性能和遥控器导航体验。
+
 ## ✨ 特性
 
 | 特性 | 说明 |
@@ -110,6 +112,58 @@ TV-Live-Player/
 ├── .gitignore
 └── README.md
 ```
+
+## 🏗️ 架构设计
+
+### 三层 Clean Architecture
+
+依赖方向：**UI → Domain ← Data**（依赖倒置），Domain 层定义 Repository 接口，Data 层实现，UI 层通过 Hilt 注入。
+
+```
+┌─────────────────────────────────────┐
+│     UI / Presentation Layer         │
+│  Activity · Fragment · ViewModel    │
+├─────────────────────────────────────┤
+│     Domain / UseCase Layer          │
+│  Repository 接口 · 业务逻辑 · 模型   │
+├─────────────────────────────────────┤
+│     Data Layer                      │
+│  Room DB · OkHttp · SharedPrefs     │
+└─────────────────────────────────────┘
+```
+
+### 📊 数据模型
+
+**Channel（频道）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 唯一标识 |
+| name | String | 频道名称 |
+| url | String | HLS 直播流地址 |
+| category | String | 分类（如"CGTN国际"） |
+| logo | String? | 台标 URL |
+| tvgId | String? | EPG ID |
+| sortOrder | Int | 排序序号 |
+| isFavorite | Boolean | 是否收藏 |
+
+**Source（M3U 订阅源）**
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 唯一标识 |
+| name | String | 源名称 |
+| url | String | M3U 链接地址 |
+| isActive | Boolean | 是否启用 |
+| createdAt | Long | 创建时间戳 |
+
+### 📱 Android 6 兼容性策略
+
+| 策略 | 说明 |
+|------|------|
+| **minSdkVersion** | API 22（Android 5.1），Android 6（API 23）完全覆盖 |
+| **ExoPlayer** | 基于原生 MediaCodec API，支持 Android 4.4+，不受 WebView 版本影响 |
+| **权限模型** | 联网权限安装即授权；文件选择使用 SAF，无需存储权限 |
+| **Desugaring** | 启用 coreLibraryDesugaring，Android 6 上可使用 java.time、Stream 等 Java 8+ API |
+| **Leanback** | 兼容 Android 5.0+，提供完整 TV 焦点管理 |
 
 ## 🚀 快速开始
 

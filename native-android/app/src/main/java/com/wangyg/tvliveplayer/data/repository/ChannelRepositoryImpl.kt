@@ -11,6 +11,7 @@ import com.wangyg.tvliveplayer.domain.model.Channel
 import com.wangyg.tvliveplayer.domain.model.Source
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -91,17 +92,8 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     override suspend fun exportData(): String {
-        val channelEntities = channelDao.getAllChannels().map { entities ->
-            entities.map { it.toDomainModel() }
-        }
-        val sourceEntities = sourceDao.getAllSources().map { entities ->
-            entities.map { it.toDomainModel() }
-        }
-
-        // Since Flow cannot be directly collected in a non-flow context,
-        // we use a helper to collect the first emission
-        val channels = collectFirst(channelEntities) ?: emptyList()
-        val sources = collectFirst(sourceEntities) ?: emptyList()
+        val channels = channelDao.getAllChannels().first().map { it.toDomainModel() }
+        val sources = sourceDao.getAllSources().first().map { it.toDomainModel() }
 
         val export = ExportData(
             channels = channels,
@@ -138,19 +130,6 @@ class ChannelRepositoryImpl @Inject constructor(
             val entities = defaultChannels.map { ChannelEntity.fromDomainModel(it) }
             channelDao.insertAll(entities)
         }
-    }
-
-    /**
-     * Helper to collect the first emission from a Flow in a suspend context.
-     */
-    private suspend fun <T> collectFirst(flow: Flow<T>): T? {
-        var result: T? = null
-        flow.collect { value ->
-            if (result == null) {
-                result = value
-            }
-        }
-        return result
     }
 
     /**

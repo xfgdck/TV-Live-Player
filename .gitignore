@@ -29,3 +29,6 @@ Thumbs.db
 *.keystore
 *.jks
 key.properties
+
+# Uploads (AI workspace temp files)
+.uploads/
