@@ -19,3 +19,18 @@
 # Hilt
 -dontwarn dagger.hilt.**
 -keep class dagger.hilt.** { *; }
+
+# Coil 3.x
+-dontwarn coil3.**
+-keep class coil3.** { *; }
+
+# OkHttp & Okio
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+
+# Kotlin Coroutines
+-dontwarn kotlinx.coroutines.**
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
