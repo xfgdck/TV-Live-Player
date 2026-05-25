@@ -2,15 +2,11 @@ package com.wangyg.tvliveplayer.ui.browse
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.leanback.app.BrowseSupportFragment
+import androidx.leanback.app.BrowseFragment as LeanbackBrowseFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
-import androidx.leanback.widget.OnItemViewClickedListener
-import androidx.leanback.widget.Presenter
-import androidx.leanback.widget.Row
-import androidx.leanback.widget.RowPresenter
 import androidx.lifecycle.lifecycleScope
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.model.Channel
@@ -22,7 +18,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class BrowseFragment : BrowseSupportFragment() {
+class BrowseFragment : LeanbackBrowseFragment() {
 
     @Inject lateinit var channelRepository: ChannelRepository
 
