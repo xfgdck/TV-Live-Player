@@ -10,7 +10,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live.cgtn.com/1000/prog_index.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn",
@@ -19,7 +19,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Documentary",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live.cgtn.com/1000d/prog_index.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.documentary",
@@ -28,7 +28,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Español",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live.cgtn.com/2000/prog_index.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.espanol",
@@ -37,7 +37,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Français",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live.cgtn.com/3000/prog_index.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.francais",
@@ -46,7 +46,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN العربية",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live.cgtn.com/4000/prog_index.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.arabic",
@@ -55,7 +55,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Russian",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live.cgtn.com/5000/prog_index.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.russian",
@@ -65,7 +65,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "NASA TV",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-1/master.m3u8",
             category = "纪录纪实",
             logo = null,
             tvgId = "nasa.tv",
@@ -75,7 +75,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "Newsmax",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://nmxlive.akamaized.net/hls/live/2102843/NMX_News_2/master.m3u8",
             category = "海外新闻",
             logo = null,
             tvgId = "newsmax",
@@ -84,7 +84,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "Al Jazeera English",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://live-hls-web-aje.getaj.net/AJE/index.m3u8",
             category = "海外新闻",
             logo = null,
             tvgId = "aljazeera.english",
@@ -94,7 +94,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "Red Bull TV",
-            url = "", // TODO: fill with actual stream URL
+            url = "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
             category = "体育运动",
             logo = null,
             tvgId = "redbull.tv",
@@ -104,7 +104,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "Test 1",
-            url = "", // TODO: fill with test stream URL
+            url = "https://live.cgtn.com/1000/prog_index.m3u8",
             category = "演示测试",
             logo = null,
             tvgId = null,
@@ -113,7 +113,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "Test 2",
-            url = "", // TODO: fill with test stream URL
+            url = "https://live.cgtn.com/1000d/prog_index.m3u8",
             category = "演示测试",
             logo = null,
             tvgId = null,

@@ -74,9 +74,9 @@ class SettingsDialogFragment : DialogFragment() {
             .setItems(presets) { _, which ->
                 val url = when (which) {
                     0 -> "https://fanmingming.com/txt?url=https://live.fanmingming.com/tv/m3u/ipv6.m3u"
-                    1 -> "https://iptv-org.github.io/iptv/index.country.m3u"
-                    2 -> "https://iptv-org.github.io/iptv/index.country.m3u"
-                    3 -> "https://iptv-org.github.io/iptv/index.country.m3u"
+                    1 -> "https://iptv-org.github.io/iptv/countries/cn.m3u"
+                    2 -> "https://iptv-org.github.io/iptv/countries/hk.m3u"
+                    3 -> "https://iptv-org.github.io/iptv/countries/tw.m3u"
                     else -> ""
                 }
                 downloadAndParse(url)
