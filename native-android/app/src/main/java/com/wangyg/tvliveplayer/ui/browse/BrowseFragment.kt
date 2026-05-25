@@ -8,19 +8,18 @@ import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import androidx.lifecycle.lifecycleScope
+import com.wangyg.tvliveplayer.MainActivity
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.model.Channel
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import com.wangyg.tvliveplayer.ui.player.PlayerActivity
-import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@AndroidEntryPoint
 class BrowseFragment : LeanbackBrowseFragment() {
 
-    @Inject lateinit var channelRepository: ChannelRepository
+    private val channelRepository: ChannelRepository
+        get() = (requireActivity() as MainActivity).channelRepository
 
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
 
