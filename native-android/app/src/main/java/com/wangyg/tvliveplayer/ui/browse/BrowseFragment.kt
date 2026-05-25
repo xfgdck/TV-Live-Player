@@ -1,5 +1,6 @@
 package com.wangyg.tvliveplayer.ui.browse
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.leanback.app.BrowseFragment as LeanbackBrowseFragment
@@ -7,21 +8,25 @@ import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
-import androidx.lifecycle.lifecycleScope
 import com.wangyg.tvliveplayer.MainActivity
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.model.Channel
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import com.wangyg.tvliveplayer.ui.player.PlayerActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class BrowseFragment : LeanbackBrowseFragment() {
 
     private val channelRepository: ChannelRepository
-        get() = (requireActivity() as MainActivity).channelRepository
+        get() = (activity as MainActivity).channelRepository
 
     private val rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
@@ -34,7 +39,7 @@ class BrowseFragment : LeanbackBrowseFragment() {
 
         setOnItemViewClickedListener { itemViewHolder, item, rowViewHolder, row ->
             if (item is Channel) {
-                val intent = Intent(requireContext(), PlayerActivity::class.java)
+                val intent = Intent(activity, PlayerActivity::class.java)
                 intent.putExtra("channel_id", item.id)
                 startActivity(intent)
             }
@@ -43,8 +48,13 @@ class BrowseFragment : LeanbackBrowseFragment() {
         loadChannels()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        scope.cancel()
+    }
+
     private fun loadChannels() {
-        lifecycleScope.launch {
+        scope.launch {
             channelRepository.getCategories().collect { categories ->
                 if (categories.isEmpty()) return@collect
                 rowsAdapter.clear()
