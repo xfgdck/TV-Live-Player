@@ -1,239 +1,190 @@
-# 万能电视直播 (TV Live Player)
 
-> 面向 Android TV 的纯客户端全屏电视直播应用，基于 React + Vite + Capacitor 构建，遥控器全操控，无需手机端。
+<p align="center">
+  <img src="native-android/app/src/main/res/drawable/ic_launcher_foreground.xml" width="120" height="120" alt="TV Live Player">
+</p>
 
----
+<h1 align="center">万能电视直播</h1>
+<p align="center"><b>TV Live Player</b></p>
 
-<!-- AI_SESSION_START -->
-## 🤖 AI 会话快速索引
-
-> **新 AI 会话必读** — 按顺序理解项目：
-
-| # | 要了解的内容 | 关键文件 | 说明 |
-|---|------------|---------|------|
-| 1 | **项目是什么** | 本 README | 电视直播 App，Android TV 遥控器操控 |
-| 2 | **类型定义** | `src/types.ts` | `TVChannel`, `CustomSource` 数据结构 |
-| 3 | **主组件 (核心逻辑)** | `src/App.tsx` | 状态管理、导航系统、数据持久化、遥控器按键处理 |
-| 4 | **视频播放器** | `src/components/TVPlayer.tsx` | hls.js 解码、全屏支持、加载/错误状态 |
-| 5 | **设置弹窗** | `src/components/CustomSourceModal.tsx` | 5个Tab：M3U订阅、手动添加、频道管理、订阅源与分类、备份恢复 |
-| 6 | **初始数据** | `src/data/defaultChannels.ts` | 出厂频道数据 + 预设 M3U 源 |
-| 7 | **M3U 解析器** | `src/utils/m3uParser.ts` | 客户端解析 M3U/M3U8 格式 |
-| 8 | **样式** | `src/index.css` | Tailwind CSS v4 + Android 系统字体 |
-| 9 | **构建配置** | `vite.config.ts` | Vite + 兼容性插件（Android 6 降级） |
-| 10 | **CI/CD** | `.github/workflows/build-apk.yml` | GitHub Actions 自动编译 APK |
-
-### 核心架构速览
-
-```
-App.tsx (主控)
-  ├── TVPlayer.tsx        ← 视频播放层 (Layer 0)
-  ├── OSD Info 层         ← OK键显示 3秒 (Layer 1)
-  ├── Category Picker     ← ← → 触发 (Layer 2)
-  └── CustomSourceModal   ← Menu键触发 (Layer 99)
-```
-
-### 导航状态机 (v2.0 简化版)
-
-```
-          watching ←─────────────────────┐
-         /    |    \                      │
-     ↑↓换台  ←→切分类  OK=信息           │ 超时4s / Back
-                  |                      │
-                  ↓                      │
-             categories ─────────────────┘
-           (分类选择器浮层)
-         ← → 选分类 · OK 确认
-```
-
-### 数据流
-
-```
-localStorage ←→ App.tsx (state) → TVPlayer (播放)
-                    ↕
-           CustomSourceModal (编辑)
-```
-
-### ⚠️ AI 工作规范（每次会话必须遵守）
-
-1. **修改源码后自动更新本 README** — 如果改动涉及导航逻辑、按键映射、组件结构、数据流、Tab 变化等，必须同步更新 README 中对应的文档段落。
-2. **优先读取 README 而非全部源码** — 本 README 已包含完整的架构说明和导航状态机，先用 `Read` 读 README 了解全貌，再按需读具体文件。
-3. **用 Grep 代替全文件 Read** — 需要定位代码时，优先 `Grep` 搜索关键字，避免通读整个文件。
-4. **并行读取无关文件** — 同时读取多个独立文件时，在一次调用中并行发起。
-<!-- AI_SESSION_END -->
+<p align="center">
+  <a href="#">
+    <img src="https://img.shields.io/badge/Android-5.1%2B-brightgreen" alt="Android 5.1+">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/Kotlin-2.0+-blue" alt="Kotlin 2.0+">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/API-22%2B-success" alt="API 22+">
+  </a>
+  <a href="#">
+    <img src="https://img.shields.io/badge/Leanback-Android%20TV-blueviolet" alt="Android TV">
+  </a>
+</p>
 
 ---
 
-## 运行环境
+**万能电视直播** 是一款面向 **Android TV（电视盒子）** 的纯客户端全屏电视直播应用，完全使用 **遥控器操控**。支持 HLS 直播流播放、M3U 订阅、频道管理、备份恢复等完整功能。
 
-| 项目 | 规格 |
+## ✨ 特性
+
+| 特性 | 说明 |
 |------|------|
-| 最低系统 | **Android 6.0** (API 23) |
-| WebView 内核 | Chrome 44+ |
-| 屏幕方向 | 横屏 |
-| 交互方式 | **纯遥控器** (D-pad + OK + Menu + Back) |
-| 默认播放 | **全屏播放**（切换频道自动全屏，双击视频切换） |
+| 📺 **HLS 直播** | 基于 ExoPlayer（Media3）原生解码，支持 Android 5.1+ 全版本 |
+| 🎮 **遥控器操控** | Leanback 原生焦点管理，6键流畅导航 |
+| 📡 **M3U 订阅** | 预设源一键导入 / 在线链接 / 本地文件 / 文本粘贴 |
+| 📋 **频道管理** | 搜索、重命名、排序、删除、收藏 |
+| 📦 **备份恢复** | JSON 导入导出，数据迁移无忧 |
+| 🏠 **全屏沉浸** | 深色主题，大字体，适合客厅远距离观看 |
+| 📱 **体积小巧** | APK 仅约 3-5MB |
+| 🔄 **自动构建** | GitHub Actions 自动编译发布 |
 
----
+## 📷 界面预览
 
-## 遥控器按键映射 (v2.0)
+> 界面设计基于 Android TV Leanback 原生风格。
 
-电视遥控器只有 **6 个可用键**：↑ ↓ ← → OK Menu Back
+- **频道浏览**：左侧分类导航 + 右侧频道卡片网格
+- **播放界面**：全屏视频 + 半透明 OSD 信息
+- **设置中心**：5 个 Tab 标签页（M3U订阅 / 手动添加 / 频道管理 / 源管理 / 备份恢复）
 
-### 观看模式（默认）
+## 🎮 遥控器按键映射
 
-| 按键 | 行为 | 说明 |
-|------|------|------|
-| **↑ ↓** | 切换频道 | 在当前分类内循环切换上/下一个频道 |
-| **← →** | 弹出分类选择器 | 显示分类浮层，默认高亮相邻分类 |
-| **OK** | 显示 OSD 信息 | 显示频道名称、分类、操作提示，3秒自动消失 |
-| **Menu** | 打开设置中心 | 进入编辑模式（详见下方） |
-| **Back** | 退出应用 | 按一次提示，3秒内再按确认退出 |
+| 按键 | 浏览模式 | 播放模式 | 设置模式 |
+|------|---------|---------|---------|
+| **↑ ↓** | 频道列表上下移动 | 切换频道（上下一个） | 选项间移动 |
+| **← →** | 切换分类 | 快速切换分类 | Tab 切换 |
+| **OK/确认** | 进入播放器 | 显示/隐藏 OSD 信息 | 确认选择 |
+| **Menu** | 打开设置中心 | 打开设置中心 | 关闭设置 |
+| **Back** | 双击退出应用 | 回到浏览界面 | 关闭设置 |
 
-### 分类选择器（← → 触发，4秒无操作自动消失）
+> OSD 信息（频道名 + 分类）在播放中按 OK 键显示，3 秒自动隐藏。
 
-| 按键 | 行为 |
+## 🛠️ 技术栈
+
+| 类别 | 技术选型 | 版本 |
+|------|---------|------|
+| 开发语言 | Kotlin | 2.0+ |
+| 构建工具 | Gradle Kotlin DSL | 8.9 |
+| UI 框架 | AndroidX Leanback | 1.2.0 |
+| 视频播放 | Media3 ExoPlayer | 1.5.1 |
+| 架构模式 | MVVM + Clean Architecture | - |
+| 依赖注入 | Hilt | 2.53.1 |
+| 本地数据库 | Room | 2.6.1 |
+| 网络请求 | OkHttp | 4.12.0 |
+| JSON 解析 | Gson | 2.11.0 |
+| 图片加载 | Coil | 3.0.4 |
+| 异步框架 | Kotlin Coroutines + Flow | 1.9.0 |
+| 最低 SDK | API 22 (Android 5.1) | - |
+| 目标 SDK | API 34 (Android 14) | - |
+
+## 📁 项目结构
+
+```
+TV-Live-Player/
+├── native-android/                  # 原生 Android 项目根目录
+│   ├── app/
+│   │   ├── src/main/
+│   │   │   ├── java/com/wangyg/tvliveplayer/
+│   │   │   │   ├── App.kt                    # Application 入口
+│   │   │   │   ├── MainActivity.kt           # 主 Activity
+│   │   │   │   ├── domain/                   # 领域层
+│   │   │   │   │   ├── model/                # Channel, Source 数据模型
+│   │   │   │   │   ├── repository/           # Repository 接口
+│   │   │   │   │   └── usecase/              # Use Case
+│   │   │   │   ├── data/                     # 数据层
+│   │   │   │   │   ├── local/                # Room 数据库
+│   │   │   │   │   ├── repository/           # Repository 实现
+│   │   │   │   │   └── preferences/          # SharedPreferences
+│   │   │   │   ├── ui/                       # UI 层
+│   │   │   │   │   ├── browse/               # 频道浏览 Fragment
+│   │   │   │   │   ├── player/               # 播放器 Activity
+│   │   │   │   │   └── settings/             # 设置中心
+│   │   │   │   ├── player/                   # ExoPlayer 封装
+│   │   │   │   └── parser/                   # M3U 解析器
+│   │   │   └── res/                          # 资源文件
+│   │   └── build.gradle.kts                  # 应用级构建配置
+│   ├── build.gradle.kts                      # 项目级构建配置
+│   ├── settings.gradle.kts                   # 项目设置
+│   ├── gradle.properties                     # Gradle 属性
+│   └── gradlew / gradlew.bat                 # Gradle 包装器
+├── .github/workflows/build-apk.yml           # GitHub Actions CI/CD
+├── .gitignore
+└── README.md
+```
+
+## 🚀 快速开始
+
+### 本地构建
+
+1. **环境要求**
+   - Android Studio (Ladybug+)
+   - JDK 17
+   - Android SDK (build-tools 34)
+
+2. **克隆并打开项目**
+   ```bash
+   git clone https://github.com/your-username/TV-Live-Player.git
+   cd TV-Live-Player/native-android
+   ```
+
+3. **使用 Android Studio**
+   - 打开 `native-android` 目录
+   - 等待 Gradle 同步完成
+   - 连接电视盒子或启动 Android TV 模拟器
+   - 点击运行 ▶️
+
+4. **命令行构建**
+   ```bash
+   # Debug APK
+   ./gradlew assembleDebug
+   
+   # Release APK (需配置签名)
+   ./gradlew assembleRelease
+   
+   # APK 输出路径
+   # app/build/outputs/apk/debug/app-debug.apk
+   # app/build/outputs/apk/release/app-release.apk
+   ```
+
+### CI/CD (GitHub Actions)
+
+项目已配置 GitHub Actions 自动构建，每次 push 到 `main/master` 分支时会自动编译 APK：
+
+| 触发条件 | 行为 |
+|---------|------|
+| Push `main/master` | 自动构建 Debug APK |
+| 创建标签 `v*` | 构建 Debug + Release APK 并发布 Release |
+| 手动触发 | 在 Actions 页面点击 "Run workflow" |
+
+> **Release 签名**：需要在 GitHub Repository Secrets 中配置以下密钥：
+> - `KEYSTORE_BASE64`：签名文件 base64 编码
+> - `KEY_ALIAS`：别名
+> - `KEY_PASSWORD`：密钥密码
+> - `STORE_PASSWORD`：存储密码
+
+## 📜 默认频道
+
+应用内置 12 个预设频道，分为 5 个分类：
+
+| 分类 | 频道 |
 |------|------|
-| **← →** | 在分类标签间切换 |
-| **OK** | 确认选择 → 切换到该分类第一个频道 |
-| **↑ ↓** | 取消选择器，同时切换频道 |
-| **Back** | 取消选择器，回到观看 |
-| **Menu** | 打开设置中心 |
+| CGTN 国际 | CGTN, CGTN Documentary, CGTN Español, CGTN Français, CGTN العربية, CGTN Русский |
+| 纪录纪实 | NASA TV |
+| 海外新闻 | Newsmax, Al Jazeera English |
+| 体育运动 | Red Bull TV |
+| 演示测试 | Test 1, Test 2 |
 
-### 设置中心（Menu 键唤出，Back 键关闭）
+> 所有频道可通过设置中心的「M3U 订阅」功能任意添加和替换。
 
-设置中心共 **5 个 Tab**，所有编辑操作仅限于此页面：
+## 📝 许可证
 
-| Tab | 功能 |
-|-----|------|
-| **订阅 M3U** | 一键导入预设源 / 在线链接 / 本地文件 / 粘贴文本 |
-| **手动添加** | 表单添加单个频道（名称/URL/分类/Logo） |
-| **频道管理** | 搜索/重命名/排序(上移下移)/删除频道 |
-| **订阅源与分类** | 管理订阅源 + 分类重命名/删除 + 恢复出厂设置 |
-| **备份恢复** | 导出/导入 JSON 备份文件 |
+本项目仅供个人学习和研究使用。
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
 
 ---
 
-## 架构概览
-
-```
-d:\TV-Live-Player\
-├── index.html               # Vite 入口 (dev)
-├── vite.config.ts           # 构建配置 + 旧版兼容
-├── package.json
-├── tsconfig.json
-├── capacitor.config.json    # Capacitor 配置
-├── .github/workflows/
-│   └── build-apk.yml        # GitHub Actions 自动编译
-├── src/
-│   ├── main.tsx             # React 入口
-│   ├── App.tsx              # 主组件: 两层焦点状态机 + 遥控器导航 + 数据持久化
-│   ├── index.css            # 全局样式 (Android 系统字体)
-│   ├── types.ts             # TVChannel, CustomSource 类型
-│   ├── components/
-│   │   ├── TVPlayer.tsx     # 视频播放器 (hls.js) + 全屏支持
-│   │   ├── TVRemoteWidget.tsx  # 虚拟遥控器 UI (未集成，预留)
-│   │   └── CustomSourceModal.tsx  # 设置中心 (5 Tab: M3U/手动/频道管理/源与分类/备份)
-│   ├── data/
-│   │   └── defaultChannels.ts  # 初始频道数据 (出厂备份) + 预设 M3U 源
-│   └── utils/
-│       └── m3uParser.ts     # M3U 文件解析器
-├── dist/                    # 构建产物 (Capacitor 从这里同步)
-└── android/                 # Capacitor Android 原生壳 (GitHub Actions 运行时生成)
-```
-
-### 技术栈
-
-| 层 | 技术 |
-|----|------|
-| UI 框架 | React 19 + TypeScript |
-| 样式 | Tailwind CSS v4 |
-| 构建 | Vite 6 |
-| 打包 | Capacitor 6 → APK |
-| 视频解码 | hls.js |
-| CI/CD | GitHub Actions |
-| 图标 | lucide-react |
-
----
-
-## GitHub Actions 自动编译 & 发布
-
-**无需本地编译环境。** Push 到 `main`/`master` 分支自动编译并发布到 Release。
-
-### 工作流: `.github/workflows/build-apk.yml`
-
-```
-推送代码 → npm install → npm run build → npx cap sync android → ./gradlew assembleDebug → 发布 Release
-```
-
-### 📥 下载 APK（推荐：从 Release 下载）
-
-1. GitHub 仓库 → 右侧 **Releases** 栏
-2. 点击最新 Release（`release-{编号}`）
-3. 下载 `tv-live-player-debug.apk`
-
-> 每次成功推送后自动创建 Release，无需等待 Actions artifact 过期（14天）。
-
-### 备选：从 Actions Artifact 下载
-
-GitHub 仓库 → **Actions** → 最新运行 → 底部 Artifacts → 下载 `tv-live-player-apk`
-
-### 关键配置
-- Node.js 20
-- Java JDK 17 (Zulu)
-- 编译目标: `targetSdkVersion = 23`, `minSdkVersion = 22`
-
----
-
-## CSS / JS 兼容性处理 (Android 6 ~ Android 16 全覆盖)
-
-Android 6 WebView (Chrome 44) 与 Android 16 WebView (Chrome 130+) 均需特殊处理，构建时自动降级：
-
-| 不兼容特性 | Chrome 要求 | 影响设备 | 处理方式 |
-|------------|:--:|------|------|
-| **Tailwind v4 `@supports` 门控** | — | **Android 16+** | 剥离 `@supports` 包装 → 变量始终生效 |
-| **`::backdrop` 伪元素** | 47+ | **Android 6** | 从选择器列表中移除 `,::backdrop` |
-| **`@supports (color:red)` 回退** | 28+ | 全部 | 剥离包装 → 内层 var() 靠源码序覆盖 |
-| **`<script type="module">`** | 61+ | Android 6 | 双路径：ESM (Chrome 61+) / SystemJS (旧版) |
-| `@layer` | 99+ | Android 6 | 剥离 `@layer` → 源码序级联 |
-| `oklch()` / `lab()` | 111+ | Android 6 | lightningcss 转 `rgb()` / hex |
-| `:where()` / `:is()` | 88+ | Android 6 | 展开为内层选择器 |
-| `@property` | 85+ | Android 6 | 移除规则 |
-| `color-mix()` | 111+ | Android 6 | 替换为直接颜色值 |
-| `Proxy` | 49+ | Android 6 | `proxy-polyfill` |
-| ES6+ 语法 | — | Android 6 | `@babel/preset-env` 转 ES5 |
-| 字体外链 | — | Android 6 | 系统字体 (Roboto / Noto Sans SC) |
-| `https` scheme | — | Android 6 | Capacitor `http` + `allowMixedContent` |
-
-### 双路径加载 (HTML)
-- **Chrome 61+** → 原生 ESM (`<script type="module">`)，快速加载
-- **Chrome 44–60** → `proxy.min.js` → `polyfills-legacy` → SystemJS → App
-- 检测方式：`'noModule' in document.createElement('script')`
-
----
-
-## 数据持久化
-
-所有数据存储在 `localStorage`，切换频道时**立即写入**，崩溃不丢失。
-
-| Key | 类型 | 说明 |
-|-----|------|------|
-| `tv_channels` | `TVChannel[]` | 全部频道 (初始 = DEFAULT_CHANNELS) |
-| `tv_favorites` | `string[]` | 收藏的频道 ID |
-| `tv_sources` | `CustomSource[]` | 已订阅的 M3U 播放源 |
-| `tv_last_channel` | `string` | 上次退出的频道 ID (启动恢复) |
-
----
-
-## 频道模型
-
-**所有频道平等** — 无"内置/自定义"区分。`INITIAL_DEFAULT_CHANNELS` 仅用于：
-1. 首次启动填充
-2. "恢复出厂设置"还原
-
-任何频道均可删除、排序、重命名，均可设置收藏。
-
----
-
-## 恢复出厂设置
-
-设置中心 → 订阅源与分类 Tab → 底部 🔄 按钮。清除所有 localStorage 数据，恢复 `INITIAL_DEFAULT_CHANNELS`。
+<p align="center">
+  <sub>Built with ❤️ for Android TV</sub>
+</p>

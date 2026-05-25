@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">万能电视直播</string>
+    <string name="channel_browse_title">频道列表</string>
+    <string name="loading">正在连接直播流...</string>
+    <string name="error_tip">连接失败</string>
+    <string name="retry">重试</string>
+    <string name="welcome">欢迎使用电视直播</string>
+    <string name="exit_confirm">再按一次退出</string>
+    <string name="no_channels">暂无频道，请通过设置添加</string>
+    <string name="add_channel">添加频道</string>
+    <string name="channel_name">频道名称</string>
+    <string name="channel_url">直播地址</string>
+    <string name="category">分类</string>
+    <string name="logo_url">Logo 地址(可选)</string>
+    <string name="settings_title">设置中心</string>
+    <string name="close">关闭</string>
+    <string name="back">返回</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="search">搜索</string>
+</resources>
