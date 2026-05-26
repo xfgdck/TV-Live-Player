@@ -30,8 +30,8 @@ class M3UParser @Inject constructor() {
                             name = name.ifEmpty { "未知频道" },
                             url = url,
                             category = category,
-                            logo = logo.ifEmpty { null },
-                            tvgId = tvgId.ifEmpty { null },
+                            logo = logo?.ifEmpty { null },
+                            tvgId = tvgId?.ifEmpty { null },
                             sortOrder = channels.size
                         ))
                     }

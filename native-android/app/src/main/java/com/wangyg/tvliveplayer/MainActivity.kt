@@ -3,10 +3,9 @@ package com.wangyg.tvliveplayer
 import android.os.Bundle
 import android.view.KeyEvent
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.FragmentActivity
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
-import com.wangyg.tvliveplayer.ui.browse.BrowseFragment as MyBrowseFragment
+import com.wangyg.tvliveplayer.ui.browse.BrowseFragment
 import com.wangyg.tvliveplayer.ui.settings.SettingsDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -25,26 +24,25 @@ class MainActivity : FragmentActivity() {
         setContentView(R.layout.activity_main)
 
         if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(android.R.id.content, MyBrowseFragment())
+            fragmentManager.beginTransaction()
+                .replace(android.R.id.content, BrowseFragment())
                 .commit()
         }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                val currentTime = System.currentTimeMillis()
-                if (currentTime - backPressedTime < backPressInterval) {
-                    finish()
-                } else {
-                    backPressedTime = currentTime
-                    Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.exit_confirm),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        })
+    }
+
+    override fun onBackPressed() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - backPressedTime < backPressInterval) {
+            finish()
+        } else {
+            backPressedTime = currentTime
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.exit_confirm),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -57,7 +55,5 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // 保存当前频道ID以便下次启动时恢复
-        // channelRepository.saveLastChannelId(...)
     }
 }

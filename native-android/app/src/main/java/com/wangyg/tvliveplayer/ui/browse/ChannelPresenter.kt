@@ -23,7 +23,7 @@ class ChannelPresenter : Presenter() {
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(viewHolder: Presenter.ViewHolder?, item: Any?) {
+    override fun onBindViewHolder(viewHolder: Presenter.ViewHolder, item: Any?) {
         val channel = item as? Channel ?: return
         val holder = viewHolder as ViewHolder
         holder.tvName.text = channel.name
@@ -37,7 +37,6 @@ class ChannelPresenter : Presenter() {
         }
     }
 
-    override fun onUnbindViewHolder(viewHolder: Presenter.ViewHolder?) {
-        // no-op
+    override fun onUnbindViewHolder(viewHolder: Presenter.ViewHolder) {
     }
 }
