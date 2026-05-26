@@ -53,7 +53,7 @@ jobs:
               -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
           else
-            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey \
+            keytool -genkey -v -keystore app/debug.keystore -alias androiddebugkey \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass android -keypass android -dname "CN=Debug, OU=Dev, O=TVLivePlayer, L=Unknown, ST=Unknown, C=CN"
             ./gradlew assembleRelease --no-daemon \
