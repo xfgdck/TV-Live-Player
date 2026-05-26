@@ -53,14 +53,21 @@ jobs:
               -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
           else
-            ./gradlew assembleRelease --no-daemon
+            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android -dname "CN=Debug, OU=Dev, O=TVLivePlayer, L=Unknown, ST=Unknown, C=CN"
+            ./gradlew assembleRelease --no-daemon \
+              -Pandroid.injected.signing.store.file=debug.keystore \
+              -Pandroid.injected.signing.store.password=android \
+              -Pandroid.injected.signing.key.alias=androiddebugkey \
+              -Pandroid.injected.signing.key.password=android
           fi
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v6
         with:
           name: TVLivePlayer-Release
-          path: native-android/app/build/outputs/apk/release/app-release.apk
+          path: native-android/app/build/outputs/apk/release/app-release*.apk
           if-no-files-found: error
 
       - name: Create GitHub Release (on tag push)
@@ -75,7 +82,7 @@ jobs:
             - 自动构建版本
             - 请从下方 Assets 下载 APK 安装
           files: |
-            native-android/app/build/outputs/apk/release/app-release.apk
+            native-android/app/build/outputs/apk/release/app-release*.apk
           draft: false
           prerelease: false
         env:
