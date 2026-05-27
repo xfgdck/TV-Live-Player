@@ -5,9 +5,10 @@ import android.view.SurfaceView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import okhttp3.OkHttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +59,11 @@ class TVPlayer @Inject constructor(private val context: Context) {
     }
 
     fun play(url: String) {
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
+        val okHttpClient = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+        val dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
         val mediaSource = HlsMediaSource.Factory(dataSourceFactory)
             .createMediaSource(MediaItem.fromUri(url))
         exoPlayer?.apply {

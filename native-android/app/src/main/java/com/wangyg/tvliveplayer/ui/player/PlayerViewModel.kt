@@ -50,6 +50,11 @@ class PlayerViewModel @Inject constructor(
         channel?.let { playChannel(it) }
     }
 
+    fun playChannelByName(name: String) {
+        val channel = _channels.value.find { it.name == name }
+        channel?.let { playChannel(it) }
+    }
+
     fun nextChannel() {
         val list = _channels.value
         if (list.isEmpty()) return

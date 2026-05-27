@@ -10,7 +10,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN",
-            url = "https://live.cgtn.com/1000/prog_index.m3u8",
+            url = "https://news.cgtn.com/resource/live/english/cgtn-news.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn",
@@ -19,7 +19,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Documentary",
-            url = "https://live.cgtn.com/1000d/prog_index.m3u8",
+            url = "https://news.cgtn.com/resource/live/document/cgtn-doc.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.documentary",
@@ -28,7 +28,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Español",
-            url = "https://live.cgtn.com/2000/prog_index.m3u8",
+            url = "https://news.cgtn.com/resource/live/espanol/cgtn-e.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.espanol",
@@ -37,7 +37,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Français",
-            url = "https://live.cgtn.com/3000/prog_index.m3u8",
+            url = "https://news.cgtn.com/resource/live/french/cgtn-f.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.francais",
@@ -46,7 +46,7 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN العربية",
-            url = "https://live.cgtn.com/4000/prog_index.m3u8",
+            url = "https://news.cgtn.com/resource/live/arabic/cgtn-a.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.arabic",
@@ -55,69 +55,40 @@ object DefaultChannels {
         Channel(
             id = UUID.randomUUID().toString(),
             name = "CGTN Russian",
-            url = "https://live.cgtn.com/5000/prog_index.m3u8",
+            url = "https://news.cgtn.com/resource/live/russian/cgtn-r.m3u8",
             category = "CGTN国际",
             logo = null,
             tvgId = "cgtn.russian",
             sortOrder = 5
         ),
-        // 纪录纪实
+        // 新闻
         Channel(
             id = UUID.randomUUID().toString(),
-            name = "NASA TV",
-            url = "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-1/master.m3u8",
-            category = "纪录纪实",
+            name = "CCTV-13 新闻",
+            url = "http://112.123.243.37:50085/tsfile/live/0014_1.m3u8?key=txiptv&playlive=0&authid=0",
+            category = "新闻",
             logo = null,
-            tvgId = "nasa.tv",
+            tvgId = "cctv13",
             sortOrder = 6
         ),
-        // 海外新闻
+        // 体育
         Channel(
             id = UUID.randomUUID().toString(),
-            name = "Newsmax",
-            url = "https://nmxlive.akamaized.net/hls/live/2102843/NMX_News_2/master.m3u8",
-            category = "海外新闻",
+            name = "CCTV-5 体育",
+            url = "http://112.123.243.37:50085/tsfile/live/0005_1.m3u8?key=txiptv&playlive=0&authid=0",
+            category = "体育",
             logo = null,
-            tvgId = "newsmax",
+            tvgId = "cctv5",
             sortOrder = 7
         ),
         Channel(
             id = UUID.randomUUID().toString(),
-            name = "Al Jazeera English",
-            url = "https://live-hls-web-aje.getaj.net/AJE/index.m3u8",
-            category = "海外新闻",
+            name = "CCTV-5+",
+            url = "http://112.123.243.37:50085/tsfile/live/0006_1.m3u8?key=txiptv&playlive=0&authid=0",
+            category = "体育",
             logo = null,
-            tvgId = "aljazeera.english",
+            tvgId = "cctv5plus",
             sortOrder = 8
-        ),
-        // 体育运动
-        Channel(
-            id = UUID.randomUUID().toString(),
-            name = "Red Bull TV",
-            url = "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
-            category = "体育运动",
-            logo = null,
-            tvgId = "redbull.tv",
-            sortOrder = 9
-        ),
-        // 演示测试
-        Channel(
-            id = UUID.randomUUID().toString(),
-            name = "Test 1",
-            url = "https://live.cgtn.com/1000/prog_index.m3u8",
-            category = "演示测试",
-            logo = null,
-            tvgId = null,
-            sortOrder = 10
-        ),
-        Channel(
-            id = UUID.randomUUID().toString(),
-            name = "Test 2",
-            url = "https://live.cgtn.com/1000d/prog_index.m3u8",
-            category = "演示测试",
-            logo = null,
-            tvgId = null,
-            sortOrder = 11
         )
     )
 }

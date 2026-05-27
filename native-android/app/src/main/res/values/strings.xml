@@ -19,4 +19,10 @@
     <string name="confirm">确认</string>
     <string name="cancel">取消</string>
     <string name="search">搜索</string>
+    <string name="channel_list">频道列表</string>
+    <string name="prev_channel">上一个频道</string>
+    <string name="next_channel">下一个频道</string>
+    <string name="play_pause">播放/暂停</string>
+    <string name="exit">退出</string>
+    <string name="change_channel">切换频道</string>
 </resources>

@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.TVLivePlayer" parent="@style/Theme.Leanback">
+    <style name="Theme.TVLivePlayer" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/background</item>
-        <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryDark">@color/primary_dark</item>
-        <item name="colorAccent">@color/accent</item>
         <item name="android:colorBackground">@color/background</item>
     </style>
 
-    <style name="Theme.TVLivePlayer.Player" parent="Theme.Leanback">
+    <style name="Theme.TVLivePlayer.Player" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">@color/black</item>
