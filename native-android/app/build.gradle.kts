@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.wangyg.tvliveplayer"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.wangyg.tvliveplayer"
         minSdk = 22
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
     }
@@ -50,8 +50,8 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.8.5")
 
     // Leanback (Android TV)
-    implementation("androidx.leanback:leanback:1.2.0-alpha04")
-    implementation("androidx.leanback:leanback-preference:1.2.0-alpha04")
+    implementation("androidx.leanback:leanback:1.2.0")
+    implementation("androidx.leanback:leanback-preference:1.2.0")
     implementation("androidx.tvprovider:tvprovider:1.1.0")
 
     // Media3 ExoPlayer
@@ -91,3 +91,5 @@ dependencies {
     // Desugaring (Java 8+ API for older Android)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
+
+
