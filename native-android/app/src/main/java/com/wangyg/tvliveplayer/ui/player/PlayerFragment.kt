@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -41,6 +42,7 @@ class PlayerFragment : Fragment() {
     private lateinit var osdLayout: View
     private lateinit var tvChannelName: TextView
     private lateinit var progressBar: ProgressBar
+    private lateinit var ivPause: ImageView
     private lateinit var tvError: TextView
     private lateinit var btnRetry: Button
     private lateinit var tvWelcome: TextView
@@ -74,6 +76,7 @@ class PlayerFragment : Fragment() {
         osdLayout = view.findViewById(R.id.osd_layout)
         tvChannelName = view.findViewById(R.id.tv_channel_name)
         progressBar = view.findViewById(R.id.progress_bar)
+        ivPause = view.findViewById(R.id.iv_pause)
         tvError = view.findViewById(R.id.tv_error)
         btnRetry = view.findViewById(R.id.btn_retry)
         tvWelcome = view.findViewById(R.id.tv_welcome)
@@ -138,27 +141,36 @@ class PlayerFragment : Fragment() {
                 when (playbackState) {
                     PlaybackState.BUFFERING -> {
                         progressBar.visibility = View.VISIBLE
+                        ivPause.visibility = View.GONE
                         tvError.visibility = View.GONE
                         tvWelcome.visibility = View.GONE
                         tvEmptyGuide.visibility = View.GONE
                     }
                     PlaybackState.READY -> {
                         progressBar.visibility = View.GONE
+                        ivPause.visibility = View.GONE
                         tvError.visibility = View.GONE
                         tvWelcome.visibility = View.GONE
                         tvEmptyGuide.visibility = View.GONE
                     }
                     PlaybackState.ERROR -> {
                         progressBar.visibility = View.GONE
+                        ivPause.visibility = View.GONE
                         tvError.visibility = View.VISIBLE
                         tvWelcome.visibility = View.GONE
                         tvEmptyGuide.visibility = View.GONE
                     }
                     PlaybackState.IDLE -> {
                         progressBar.visibility = View.GONE
+                        tvError.visibility = View.GONE
                         if (viewModel.state.value.channels.isEmpty()) {
+                            ivPause.visibility = View.GONE
                             tvWelcome.visibility = View.GONE
                             tvEmptyGuide.visibility = View.VISIBLE
+                        } else {
+                            ivPause.visibility = View.VISIBLE
+                            tvWelcome.visibility = View.GONE
+                            tvEmptyGuide.visibility = View.GONE
                         }
                     }
                 }
@@ -507,16 +519,11 @@ class PlayerFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
-        if (viewModel.state.value.videoPaused) {
-            tvPlayer.pause()
-        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (!viewModel.state.value.videoPaused) {
-            tvPlayer.resume()
-        }
+        tvPlayer.resume()
     }
 
     override fun onDestroy() {

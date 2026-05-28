@@ -43,7 +43,7 @@ class MainActivity : FragmentActivity() {
     fun showSettings() {
         val fragment = com.wangyg.tvliveplayer.ui.settings.SettingsFragment()
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
+            .add(R.id.fragment_container, fragment, "settings")
             .addToBackStack("settings")
             .commit()
     }
@@ -51,7 +51,7 @@ class MainActivity : FragmentActivity() {
     fun showChannelEdit() {
         val fragment = com.wangyg.tvliveplayer.ui.channel.ChannelEditFragment()
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
+            .add(R.id.fragment_container, fragment, "channel_edit")
             .addToBackStack("channel_edit")
             .commit()
     }

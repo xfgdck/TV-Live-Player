@@ -241,9 +241,6 @@ class PlayerViewModel @Inject constructor(
 
     fun navigateTo(screen: Screen) {
         val stack = _state.value.screenStack
-        if (screen == Screen.SETTINGS || screen == Screen.CHANNEL_EDIT) {
-            _state.update { it.copy(videoPaused = true) }
-        }
         _state.update { it.copy(screenStack = stack + screen) }
     }
 
@@ -256,25 +253,8 @@ class PlayerViewModel @Inject constructor(
             }
             return false
         }
-        val removed = stack.removeLast()
-        val newScreen = stack.last()
-        val isPaused = _state.value.videoPaused
-        if (newScreen == Screen.PLAYER && _state.value.enteredByOk) {
-            _state.update {
-                it.copy(
-                    screenStack = stack,
-                    videoPaused = false,
-                    enteredByOk = false
-                )
-            }
-        } else {
-            _state.update {
-                it.copy(
-                    screenStack = stack,
-                    videoPaused = if (newScreen == Screen.PLAYER) false else isPaused
-                )
-            }
-        }
+        stack.removeLast()
+        _state.update { it.copy(screenStack = stack) }
         return true
     }
 
