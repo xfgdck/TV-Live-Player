@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.wangyg.tvliveplayer"
-        minSdk = 22
+        minSdk = 23
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"

@@ -1,9 +1,7 @@
 package com.wangyg.tvliveplayer.ui.browse
 
-import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
-import androidx.leanback.app.BrowseFragment as LeanbackBrowseFragment
+import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
@@ -12,7 +10,6 @@ import com.wangyg.tvliveplayer.MainActivity
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.model.Channel
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
-import com.wangyg.tvliveplayer.ui.player.PlayerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +17,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class BrowseFragment : LeanbackBrowseFragment() {
+class ChannelBrowseFragment : BrowseSupportFragment() {
 
     private val channelRepository: ChannelRepository
         get() = (activity as MainActivity).channelRepository
@@ -39,9 +36,7 @@ class BrowseFragment : LeanbackBrowseFragment() {
 
         setOnItemViewClickedListener { itemViewHolder, item, rowViewHolder, row ->
             if (item is Channel) {
-                val intent = Intent(activity, PlayerActivity::class.java)
-                intent.putExtra("channel_id", item.id)
-                startActivity(intent)
+                (activity as? MainActivity)?.startPlayer(item.name)
             }
         }
 

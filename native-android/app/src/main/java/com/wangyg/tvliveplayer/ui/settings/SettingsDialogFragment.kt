@@ -2,7 +2,9 @@ package com.wangyg.tvliveplayer.ui.settings
 
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.DialogInterface
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.widget.EditText
 import android.widget.Toast
@@ -22,6 +24,8 @@ class SettingsDialogFragment : DialogFragment() {
     @Inject lateinit var channelRepository: ChannelRepository
     @Inject lateinit var m3uParser: M3UParser
 
+    private var selectedTab = 0
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val items = arrayOf(
             "订阅 M3U",
@@ -30,9 +34,10 @@ class SettingsDialogFragment : DialogFragment() {
             "订阅源与分类管理",
             "备份与恢复"
         )
-        return AlertDialog.Builder(requireActivity())
+        val dialog = AlertDialog.Builder(requireActivity())
             .setTitle("设置中心")
-            .setItems(items) { _, which ->
+            .setSingleChoiceItems(items, selectedTab) { _, which ->
+                selectedTab = which
                 when (which) {
                     0 -> showM3uSubscriptionDialog()
                     1 -> showManualAddDialog()
@@ -43,23 +48,47 @@ class SettingsDialogFragment : DialogFragment() {
             }
             .setNegativeButton("关闭", null)
             .create()
+
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        selectedTab = (selectedTab - 1 + items.size) % items.size
+                        updateSelection(dialog, items)
+                        true
+                    }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        selectedTab = (selectedTab + 1) % items.size
+                        updateSelection(dialog, items)
+                        true
+                    }
+                    KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_MENU -> {
+                        dialog.dismiss()
+                        true
+                    }
+                    else -> false
+                }
+            } else false
+        }
+        return dialog
     }
 
-    // Tab 1: M3U订阅
+    private fun updateSelection(dialog: Dialog, items: Array<String>) {
+        val listView = (dialog as? AlertDialog)?.listView ?: return
+        listView.setItemChecked(selectedTab, true)
+        listView.smoothScrollToPosition(selectedTab)
+    }
+
     private fun showM3uSubscriptionDialog() {
         val options = arrayOf("预设源一键导入", "在线链接解析", "本地文件导入", "粘贴M3U文本")
-        AlertDialog.Builder(requireActivity())
-            .setTitle("订阅 M3U")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> importPresetSources()
-                    1 -> showUrlInputDialog()
-                    2 -> showToast("请通过文件管理器选择 .m3u 文件")
-                    3 -> showPasteM3uDialog()
-                }
+        showSubDialog("订阅 M3U", options) { which ->
+            when (which) {
+                0 -> importPresetSources()
+                1 -> showUrlInputDialog()
+                2 -> showToast("请通过文件管理器选择 .m3u 文件")
+                3 -> showPasteM3uDialog()
             }
-            .setNegativeButton("返回", null)
-            .show()
+        }
     }
 
     private fun importPresetSources() {
@@ -69,20 +98,16 @@ class SettingsDialogFragment : DialogFragment() {
             "IPTV-Org 香港",
             "IPTV-Org 台湾"
         )
-        AlertDialog.Builder(requireActivity())
-            .setTitle("选择预设源")
-            .setItems(presets) { _, which ->
-                val url = when (which) {
-                    0 -> "https://fanmingming.com/txt?url=https://live.fanmingming.com/tv/m3u/ipv6.m3u"
-                    1 -> "https://iptv-org.github.io/iptv/countries/cn.m3u"
-                    2 -> "https://iptv-org.github.io/iptv/countries/hk.m3u"
-                    3 -> "https://iptv-org.github.io/iptv/countries/tw.m3u"
-                    else -> ""
-                }
-                downloadAndParse(url)
+        showSubDialog("选择预设源", presets) { which ->
+            val url = when (which) {
+                0 -> "https://fanmingming.com/txt?url=https://live.fanmingming.com/tv/m3u/ipv6.m3u"
+                1 -> "https://iptv-org.github.io/iptv/countries/cn.m3u"
+                2 -> "https://iptv-org.github.io/iptv/countries/hk.m3u"
+                3 -> "https://iptv-org.github.io/iptv/countries/tw.m3u"
+                else -> ""
             }
-            .setNegativeButton("返回", null)
-            .show()
+            downloadAndParse(url)
+        }
     }
 
     private fun downloadAndParse(url: String) {
@@ -105,41 +130,30 @@ class SettingsDialogFragment : DialogFragment() {
     private fun showUrlInputDialog() {
         val input = EditText(requireActivity())
         input.hint = "输入 M3U 链接地址"
-        AlertDialog.Builder(requireActivity())
-            .setTitle("在线链接")
-            .setView(input)
-            .setPositiveButton("下载") { _, _ ->
-                val url = input.text.toString().trim()
-                if (url.isNotEmpty()) downloadAndParse(url)
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        showSubDialog("在线链接", input) { _, _ ->
+            val url = input.text.toString().trim()
+            if (url.isNotEmpty()) downloadAndParse(url)
+        }
     }
 
     private fun showPasteM3uDialog() {
         val input = EditText(requireActivity())
         input.hint = "粘贴 M3U 文本内容"
         input.minLines = 5
-        AlertDialog.Builder(requireActivity())
-            .setTitle("粘贴 M3U")
-            .setView(input)
-            .setPositiveButton("解析") { _, _ ->
-                val text = input.text.toString().trim()
-                if (text.isNotEmpty()) {
-                    lifecycleScope.launch {
-                        val useCase = com.wangyg.tvliveplayer.domain.usecase.ParseAndImportM3UUseCase(
-                            m3uParser, channelRepository
-                        )
-                        val count = useCase(text, null)
-                        showToast("解析完成！共 $count 个频道")
-                    }
+        showSubDialog("粘贴 M3U", input) { _, _ ->
+            val text = input.text.toString().trim()
+            if (text.isNotEmpty()) {
+                lifecycleScope.launch {
+                    val useCase = com.wangyg.tvliveplayer.domain.usecase.ParseAndImportM3UUseCase(
+                        m3uParser, channelRepository
+                    )
+                    val count = useCase(text, null)
+                    showToast("解析完成！共 $count 个频道")
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
     }
 
-    // Tab 2: 手动添加频道
     private fun showManualAddDialog() {
         val view = LayoutInflater.from(requireActivity()).inflate(R.layout.dialog_add_channel, null)
         val etName = view.findViewById<EditText>(R.id.et_channel_name)
@@ -174,12 +188,10 @@ class SettingsDialogFragment : DialogFragment() {
             .show()
     }
 
-    // Tab 3: 频道管理
     private fun showChannelManagementDialog() {
         showToast("频道管理功能：请在主界面选择频道后使用遥控器菜单键操作")
     }
 
-    // Tab 4: 订阅源与分类管理
     private fun showSourceManagementDialog() {
         lifecycleScope.launch {
             try {
@@ -191,49 +203,57 @@ class SettingsDialogFragment : DialogFragment() {
                 val sourceItems = sources.mapIndexed { index, source ->
                     "${index + 1}. ${source.url}"
                 }.toTypedArray()
-                AlertDialog.Builder(requireActivity())
-                    .setTitle("订阅源管理")
-                    .setItems(sourceItems) { _, which ->
-                        if (which in sources.indices) {
-                            val selected = sources[which]
-                            AlertDialog.Builder(requireActivity())
-                                .setTitle("删除订阅源")
-                                .setMessage("确定要删除此订阅源吗？\n${selected.url}")
-                                .setPositiveButton("删除") { _, _ ->
-                                    lifecycleScope.launch {
-                                        channelRepository.deleteSource(sources[which])
-                                        showToast("已删除订阅源")
-                                    }
+                showSubDialog("订阅源管理", sourceItems) { which ->
+                    if (which in sources.indices) {
+                        val selected = sources[which]
+                        AlertDialog.Builder(requireActivity())
+                            .setTitle("删除订阅源")
+                            .setMessage("确定要删除此订阅源吗？\n${selected.url}")
+                            .setPositiveButton("删除") { _, _ ->
+                                lifecycleScope.launch {
+                                    channelRepository.deleteSource(sources[which])
+                                    showToast("已删除订阅源")
                                 }
-                                .setNegativeButton("取消", null)
-                                .show()
-                        }
+                            }
+                            .setNegativeButton("取消", null)
+                            .show()
                     }
-                    .setNegativeButton("返回", null)
-                    .show()
+                }
             } catch (e: Exception) {
                 showToast("获取订阅源失败：${e.localizedMessage}")
             }
         }
     }
 
-    // Tab 5: 备份恢复
     private fun showBackupRestoreDialog() {
         val options = arrayOf("导出数据到JSON", "从JSON导入恢复")
-        AlertDialog.Builder(requireActivity())
-            .setTitle("备份与恢复")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> {
-                        lifecycleScope.launch {
-                            val json = channelRepository.exportData()
-                            showToast("数据已导出 (${json.length} 字符)")
-                        }
+        showSubDialog("备份与恢复", options) { which ->
+            when (which) {
+                0 -> {
+                    lifecycleScope.launch {
+                        val json = channelRepository.exportData()
+                        showToast("数据已导出 (${json.length} 字符)")
                     }
-                    1 -> showToast("请选择JSON文件导入")
                 }
+                1 -> showToast("请选择JSON文件导入")
             }
+        }
+    }
+
+    private fun showSubDialog(title: String, items: Array<String>, onSelect: (Int) -> Unit) {
+        AlertDialog.Builder(requireActivity())
+            .setTitle(title)
+            .setItems(items) { _, which -> onSelect(which) }
             .setNegativeButton("返回", null)
+            .show()
+    }
+
+    private fun showSubDialog(title: String, view: android.view.View, onConfirm: (DialogInterface, Int) -> Unit) {
+        AlertDialog.Builder(requireActivity())
+            .setTitle(title)
+            .setView(view)
+            .setPositiveButton("确定", onConfirm)
+            .setNegativeButton("取消", null)
             .show()
     }
 

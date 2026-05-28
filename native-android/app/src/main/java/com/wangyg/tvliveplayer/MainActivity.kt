@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.wangyg.tvliveplayer.data.preferences.AppPreferences
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
+import com.wangyg.tvliveplayer.ui.browse.ChannelBrowseFragment
 import com.wangyg.tvliveplayer.ui.player.PlayerActivity
 import com.wangyg.tvliveplayer.ui.settings.SettingsDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,17 +36,17 @@ class MainActivity : FragmentActivity() {
                 lifecycleScope.launch {
                     channelRepository.resetToDefaults()
                     appPreferences.setFirstLaunchDone()
-                    startPlayer()
                 }
-            } else {
-                startPlayer()
             }
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, ChannelBrowseFragment())
+                .commit()
         }
     }
 
-    private fun startPlayer() {
+    fun startPlayer(channelName: String) {
         val intent = Intent(this, PlayerActivity::class.java)
-        intent.putExtra("channel_name", "CGTN")
+        intent.putExtra("channel_name", channelName)
         startActivity(intent)
     }
 
