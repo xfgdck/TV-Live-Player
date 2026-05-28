@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:keepScreenOn="true">
+
+    <SurfaceView
+        android:id="@+id/surface_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/error_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/tv_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/error_tip"
+            android:textColor="@color/error_color"
+            android:textSize="20sp" />
+        <Button
+            android:id="@+id/btn_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/retry" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_welcome"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/welcome"
+        android:textColor="@color/text_secondary"
+        android:textSize="24sp"
+        android:visibility="gone" />
+
+    <!-- Empty state guide -->
+    <TextView
+        android:id="@+id/tv_empty_guide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginBottom="80dp"
+        android:text="暂无频道\n请按OK键进入设置添加直播源"
+        android:textColor="@color/text_secondary"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:visibility="gone" />
+
+    <!-- Channel info (top-left) -->
+    <LinearLayout
+        android:id="@+id/osd_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:background="#66000000"
+        android:orientation="vertical"
+        android:padding="10dp">
+        <TextView
+            android:id="@+id/tv_channel_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tv_category"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- Exit confirm overlay -->
+    <TextView
+        android:id="@+id/tv_exit_confirm"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center|bottom"
+        android:layout_marginBottom="60dp"
+        android:background="#88000000"
+        android:padding="16dp"
+        android:text="@string/exit_confirm"
+        android:textColor="@color/text_primary"
+        android:textSize="20sp"
+        android:visibility="gone" />
+
+    <!-- Right-side icon panel (hidden by default, shown on trigger) -->
+    <LinearLayout
+        android:id="@+id/icon_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone"
+        android:orientation="vertical">
+        <ImageButton
+            android:id="@+id/btn_icon_settings"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_settings"
+            android:background="@drawable/menu_item_bg"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            android:focusable="true"
+            android:clickable="true" />
+        <ImageButton
+            android:id="@+id/btn_icon_edit"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:src="@drawable/ic_edit"
+            android:background="@drawable/menu_item_bg"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            android:focusable="true"
+            android:clickable="true" />
+        <ImageButton
+            android:id="@+id/btn_icon_favorite"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:src="@drawable/ic_favorite_outline"
+            android:background="@drawable/menu_item_bg"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            android:focusable="true"
+            android:clickable="true" />
+    </LinearLayout>
+
+    <!-- Category select overlay (bottom) -->
+    <LinearLayout
+        android:id="@+id/category_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#CC000000"
+        android:orientation="vertical"
+        android:paddingBottom="16dp"
+        android:visibility="gone">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp">
+            <LinearLayout
+                android:id="@+id/category_channel_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+            <LinearLayout
+                android:id="@+id/category_tabs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+    </LinearLayout>
+
+</FrameLayout>

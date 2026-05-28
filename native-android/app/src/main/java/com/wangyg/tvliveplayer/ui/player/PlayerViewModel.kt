@@ -2,111 +2,305 @@ package com.wangyg.tvliveplayer.ui.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wangyg.tvliveplayer.data.preferences.AppPreferences
 import com.wangyg.tvliveplayer.domain.model.Channel
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class Screen {
+    PLAYER,
+    CATEGORY_SELECT,
+    ICON_SELECT,
+    MENU,
+    SETTINGS,
+    CHANNEL_EDIT,
+    ADD_SOURCE,
+    UPDATE
+}
+
+data class PlayerUiState(
+    val channels: List<Channel> = emptyList(),
+    val allCategories: List<String> = emptyList(),
+    val currentChannel: Channel? = null,
+    val currentIndex: Int = 0,
+    val isFavorite: Boolean = false,
+    val screenStack: List<Screen> = listOf(Screen.PLAYER),
+    val categoryChannels: List<Channel> = emptyList(),
+    val selectedCategoryIndex: Int = 0,
+    val selectedChannelIndex: Int = 0,
+    val showOsd: Boolean = false,
+    val osdText: String = "",
+    val osdCategory: String = "",
+    val showExitConfirm: Boolean = false,
+    val videoPaused: Boolean = false,
+    val enteredByOk: Boolean = false,
+    val channelsLoaded: Boolean = false
+)
+
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    private val repository: ChannelRepository
+    private val repository: ChannelRepository,
+    private val appPreferences: AppPreferences
 ) : ViewModel() {
 
-    private val _channels = MutableStateFlow<List<Channel>>(emptyList())
-    val channels: StateFlow<List<Channel>> = _channels.asStateFlow()
-
-    private val _categories = MutableStateFlow<List<String>>(emptyList())
-    val categories: StateFlow<List<String>> = _categories.asStateFlow()
-
-    private val _currentCategory = MutableStateFlow("")
-    val currentCategory: StateFlow<String> = _currentCategory.asStateFlow()
-
-    private val _currentChannel = MutableStateFlow<Channel?>(null)
-    val currentChannel: StateFlow<Channel?> = _currentChannel.asStateFlow()
-
-    private val _showOsd = MutableStateFlow(false)
-    val showOsd: StateFlow<Boolean> = _showOsd.asStateFlow()
-
-    private var currentIndex = 0
+    private val _state = MutableStateFlow(PlayerUiState())
+    val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
     init {
+        loadChannels()
+    }
+
+    private fun loadChannels() {
         viewModelScope.launch {
             repository.getAllChannels().collect { list ->
-                _channels.value = list
-                val cats = list.map { it.category }.distinct()
-                _categories.value = cats
-                if (_currentChannel.value == null && list.isNotEmpty()) {
-                    currentIndex = 0
-                    _currentChannel.value = list[0]
+                val stateVal = _state.value
+                val cats = repository.getAllCategoriesWithFavorite().first()
+
+                if (!stateVal.channelsLoaded) {
+                    val lastId = appPreferences.getLastChannelId()
+                    val targetChannel = if (lastId != null) {
+                        list.find { it.id == lastId } ?: list.firstOrNull()
+                    } else {
+                        list.firstOrNull()
+                    }
+                    val idx = if (targetChannel != null) list.indexOf(targetChannel) else 0
+                    val isFav = if (targetChannel != null) repository.isFavorite(targetChannel.id) else false
+
+                    _state.update {
+                        it.copy(
+                            channels = list,
+                            allCategories = cats,
+                            currentChannel = targetChannel,
+                            currentIndex = idx,
+                            isFavorite = isFav,
+                            channelsLoaded = true
+                        )
+                    }
+                    if (targetChannel != null) {
+                        appPreferences.setLastChannelId(targetChannel.id)
+                    }
+                } else {
+                    val currentId = stateVal.currentChannel?.id
+                    val isFav = if (currentId != null) repository.isFavorite(currentId) else false
+                    _state.update {
+                        it.copy(
+                            channels = list,
+                            allCategories = cats,
+                            isFavorite = isFav
+                        )
+                    }
                 }
             }
         }
     }
 
-    fun playChannel(channel: Channel) {
-        val idx = _channels.value.indexOfFirst { it.id == channel.id }
-        if (idx >= 0) currentIndex = idx
-        _currentChannel.value = channel
+    private fun saveLastChannel(channel: Channel) {
+        appPreferences.setLastChannelId(channel.id)
     }
 
-    fun playChannelByName(name: String) {
-        val channel = _channels.value.find { it.name == name }
-        channel?.let { playChannel(it) }
+    fun playChannel(channel: Channel) {
+        val idx = _state.value.channels.indexOfFirst { it.id == channel.id }
+        if (idx >= 0) {
+            _state.update {
+                it.copy(
+                    currentChannel = channel,
+                    currentIndex = idx,
+                    isFavorite = channel.isFavorite
+                )
+            }
+        } else {
+            _state.update { it.copy(currentChannel = channel, isFavorite = channel.isFavorite) }
+        }
+        saveLastChannel(channel)
     }
 
     fun nextChannel() {
-        val list = _channels.value
+        val s = _state.value
+        val list = s.channels
         if (list.isEmpty()) return
-        currentIndex = (currentIndex + 1) % list.size
-        _currentChannel.value = list[currentIndex]
+        val newIdx = (s.currentIndex + 1) % list.size
+        val ch = list[newIdx]
+        viewModelScope.launch {
+            val isFav = repository.isFavorite(ch.id)
+            _state.update {
+                it.copy(
+                    currentChannel = ch,
+                    currentIndex = newIdx,
+                    isFavorite = isFav
+                )
+            }
+            saveLastChannel(ch)
+        }
     }
 
     fun previousChannel() {
-        val list = _channels.value
+        val s = _state.value
+        val list = s.channels
         if (list.isEmpty()) return
-        currentIndex = (currentIndex - 1 + list.size) % list.size
-        _currentChannel.value = list[currentIndex]
-    }
-
-    fun nextCategory() {
-        val list = _channels.value
-        val cats = _categories.value
-        if (list.isEmpty() || cats.isEmpty()) return
-        val curCat = _currentChannel.value?.category ?: cats[0]
-        val catIdx = cats.indexOf(curCat)
-        if (catIdx < 0) return
-        val nextCat = cats[(catIdx + 1) % cats.size]
-        val firstInCat = list.indexOfFirst { it.category == nextCat }
-        if (firstInCat >= 0) {
-            currentIndex = firstInCat
-            _currentChannel.value = list[currentIndex]
+        val newIdx = (s.currentIndex - 1 + list.size) % list.size
+        val ch = list[newIdx]
+        viewModelScope.launch {
+            val isFav = repository.isFavorite(ch.id)
+            _state.update {
+                it.copy(
+                    currentChannel = ch,
+                    currentIndex = newIdx,
+                    isFavorite = isFav
+                )
+            }
+            saveLastChannel(ch)
         }
     }
 
-    fun previousCategory() {
-        val list = _channels.value
-        val cats = _categories.value
-        if (list.isEmpty() || cats.isEmpty()) return
-        val curCat = _currentChannel.value?.category ?: cats[0]
-        val catIdx = cats.indexOf(curCat)
-        if (catIdx < 0) return
-        val prevCat = cats[(catIdx - 1 + cats.size) % cats.size]
-        val firstInCat = list.indexOfFirst { it.category == prevCat }
-        if (firstInCat >= 0) {
-            currentIndex = firstInCat
-            _currentChannel.value = list[currentIndex]
+    fun selectCategory(index: Int) {
+        val cats = _state.value.allCategories
+        if (index < 0 || index >= cats.size) return
+        val cat = cats[index]
+        viewModelScope.launch {
+            val channels = repository.getChannelsByCategory(cat).first()
+            _state.update {
+                it.copy(
+                    selectedCategoryIndex = index,
+                    categoryChannels = channels,
+                    selectedChannelIndex = 0
+                )
+            }
         }
     }
 
-    fun toggleOsd() {
-        _showOsd.value = !_showOsd.value
+    fun focusCategoryChannel(index: Int) {
+        val chs = _state.value.categoryChannels
+        if (index < 0 || index >= chs.size) return
+        _state.update { it.copy(selectedChannelIndex = index) }
     }
 
-    fun hideOsd() {
-        _showOsd.value = false
+    fun confirmCategorySelect() {
+        val chs = _state.value.categoryChannels
+        val idx = _state.value.selectedChannelIndex
+        if (chs.isNotEmpty() && idx < chs.size) {
+            playChannel(chs[idx])
+        }
+    }
+
+    fun resetToPlayer() {
+        _state.update {
+            it.copy(
+                screenStack = listOf(Screen.PLAYER),
+                videoPaused = false,
+                enteredByOk = false
+            )
+        }
+    }
+
+    fun cancelCategorySelect() {
+        _state.update { it.copy(screenStack = listOf(Screen.PLAYER)) }
+    }
+
+    fun enterCategorySelect() {
+        val s = _state.value
+        val curCat = s.currentChannel?.category ?: s.allCategories.firstOrNull() ?: return
+        val catIdx = s.allCategories.indexOf(curCat).coerceAtLeast(0)
+        viewModelScope.launch {
+            val channels = repository.getChannelsByCategory(curCat).first()
+            val chIdx = channels.indexOfFirst { it.id == s.currentChannel?.id }.coerceAtLeast(0)
+            _state.update {
+                it.copy(
+                    screenStack = listOf(Screen.CATEGORY_SELECT),
+                    selectedCategoryIndex = catIdx,
+                    categoryChannels = channels,
+                    selectedChannelIndex = chIdx
+                )
+            }
+        }
+    }
+
+    fun openMenu(fromOk: Boolean) {
+        if (fromOk) {
+            _state.update { it.copy(videoPaused = true, enteredByOk = true) }
+        }
+        _state.update { it.copy(screenStack = _state.value.screenStack + Screen.MENU) }
+    }
+
+    fun closeMenu() {
+        val s = _state.value
+        _state.update {
+            it.copy(
+                screenStack = listOf(Screen.PLAYER),
+                videoPaused = false,
+                enteredByOk = false
+            )
+        }
+    }
+
+    fun navigateTo(screen: Screen) {
+        val stack = _state.value.screenStack
+        if (screen == Screen.SETTINGS || screen == Screen.CHANNEL_EDIT) {
+            _state.update { it.copy(videoPaused = true) }
+        }
+        _state.update { it.copy(screenStack = stack + screen) }
+    }
+
+    fun navigateBack(): Boolean {
+        val stack = _state.value.screenStack.toMutableList()
+        if (stack.size <= 1) {
+            if (stack.last() == Screen.PLAYER) {
+                _state.update { it.copy(showExitConfirm = true) }
+                return false
+            }
+            return false
+        }
+        val removed = stack.removeLast()
+        val newScreen = stack.last()
+        val isPaused = _state.value.videoPaused
+        if (newScreen == Screen.PLAYER && _state.value.enteredByOk) {
+            _state.update {
+                it.copy(
+                    screenStack = stack,
+                    videoPaused = false,
+                    enteredByOk = false
+                )
+            }
+        } else {
+            _state.update {
+                it.copy(
+                    screenStack = stack,
+                    videoPaused = if (newScreen == Screen.PLAYER) false else isPaused
+                )
+            }
+        }
+        return true
+    }
+
+    fun dismissExitConfirm() {
+        _state.update { it.copy(showExitConfirm = false) }
+    }
+
+    fun toggleFavorite() {
+        val channel = _state.value.currentChannel ?: return
+        viewModelScope.launch {
+            val isFav = repository.toggleFavorite(channel.id)
+            _state.update { it.copy(isFavorite = isFav) }
+        }
+    }
+
+    fun refreshCategoryChannels(category: String) {
+        viewModelScope.launch {
+            val channels = repository.getChannelsByCategory(category).first()
+            _state.update { it.copy(categoryChannels = channels) }
+        }
+    }
+
+    fun refreshAll() {
+        viewModelScope.launch {
+            val cats = repository.getAllCategoriesWithFavorite().first()
+            _state.update { it.copy(allCategories = cats) }
+        }
     }
 }

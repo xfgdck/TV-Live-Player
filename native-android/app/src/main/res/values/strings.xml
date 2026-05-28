@@ -6,7 +6,7 @@
     <string name="error_tip">连接失败</string>
     <string name="retry">重试</string>
     <string name="welcome">欢迎使用电视直播</string>
-    <string name="exit_confirm">再按一次退出</string>
+    <string name="exit_confirm">再按一次返回键退出</string>
     <string name="no_channels">暂无频道，请通过设置添加</string>
     <string name="add_channel">添加频道</string>
     <string name="channel_name">频道名称</string>
@@ -25,4 +25,6 @@
     <string name="play_pause">播放/暂停</string>
     <string name="exit">退出</string>
     <string name="change_channel">切换频道</string>
+    <string name="add_favorite">☆ 添加收藏</string>
+    <string name="remove_favorite">★ 取消收藏</string>
 </resources>

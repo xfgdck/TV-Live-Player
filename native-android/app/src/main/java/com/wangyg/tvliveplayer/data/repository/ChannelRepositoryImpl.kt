@@ -31,6 +31,11 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     override fun getChannelsByCategory(category: String): Flow<List<Channel>> {
+        if (category == ChannelRepository.FAVORITE_CATEGORY) {
+            return channelDao.getFavoriteChannels().map { entities ->
+                entities.map { it.toDomainModel() }
+            }
+        }
         return channelDao.getChannelsByCategory(category).map { entities ->
             entities.map { it.toDomainModel() }
         }
@@ -38,6 +43,17 @@ class ChannelRepositoryImpl @Inject constructor(
 
     override fun getCategories(): Flow<List<String>> {
         return channelDao.getCategories()
+    }
+
+    override fun getAllCategoriesWithFavorite(): Flow<List<String>> {
+        return channelDao.getCategories().map { categories ->
+            val hasFavorites = channelDao.getFavoriteChannels().first().isNotEmpty()
+            if (hasFavorites) {
+                listOf(ChannelRepository.FAVORITE_CATEGORY) + categories
+            } else {
+                categories
+            }
+        }
     }
 
     override fun searchChannels(query: String): Flow<List<Channel>> {
@@ -67,10 +83,26 @@ class ChannelRepositoryImpl @Inject constructor(
         channelDao.deleteAll()
     }
 
-    override suspend fun toggleFavorite(channelId: String) {
+    override suspend fun isFavorite(channelId: String): Boolean {
+        val entity = channelDao.getChannelById(channelId) ?: return false
+        return entity.favorite == 1
+    }
+
+    override suspend fun addFavorite(channelId: String) {
         val entity = channelDao.getChannelById(channelId) ?: return
-        val updated = entity.copy(favorite = if (entity.favorite == 1) 0 else 1)
-        channelDao.update(updated)
+        channelDao.update(entity.copy(favorite = 1))
+    }
+
+    override suspend fun removeFavorite(channelId: String) {
+        val entity = channelDao.getChannelById(channelId) ?: return
+        channelDao.update(entity.copy(favorite = 0))
+    }
+
+    override suspend fun toggleFavorite(channelId: String): Boolean {
+        val entity = channelDao.getChannelById(channelId) ?: return false
+        val newFav = if (entity.favorite == 1) 0 else 1
+        channelDao.update(entity.copy(favorite = newFav))
+        return newFav == 1
     }
 
     override fun getAllSources(): Flow<List<Source>> {

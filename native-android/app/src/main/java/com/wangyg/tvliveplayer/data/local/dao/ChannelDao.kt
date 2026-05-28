@@ -18,6 +18,9 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE category = :category ORDER BY sortOrder ASC")
     fun getChannelsByCategory(category: String): Flow<List<ChannelEntity>>
 
+    @Query("SELECT * FROM channels WHERE favorite = 1 ORDER BY sortOrder ASC")
+    fun getFavoriteChannels(): Flow<List<ChannelEntity>>
+
     @Query("SELECT DISTINCT category FROM channels ORDER BY category")
     fun getCategories(): Flow<List<String>>
 

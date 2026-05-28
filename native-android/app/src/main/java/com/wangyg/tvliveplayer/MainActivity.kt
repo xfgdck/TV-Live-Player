@@ -1,16 +1,14 @@
 package com.wangyg.tvliveplayer
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
-import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.activity.viewModels
 import com.wangyg.tvliveplayer.data.preferences.AppPreferences
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
-import com.wangyg.tvliveplayer.ui.browse.ChannelBrowseFragment
-import com.wangyg.tvliveplayer.ui.player.PlayerActivity
-import com.wangyg.tvliveplayer.ui.settings.SettingsDialogFragment
+import com.wangyg.tvliveplayer.ui.player.PlayerFragment
+import com.wangyg.tvliveplayer.ui.player.PlayerViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -18,61 +16,65 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    @Inject
-    lateinit var channelRepository: ChannelRepository
+    @Inject lateinit var channelRepository: ChannelRepository
+    @Inject lateinit var appPreferences: AppPreferences
 
-    @Inject
-    lateinit var appPreferences: AppPreferences
-
-    private var backPressedTime = 0L
-    private val backPressInterval = 2000L
+    val playerViewModel: PlayerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        if (savedInstanceState == null) {
-            if (appPreferences.isFirstLaunch()) {
-                lifecycleScope.launch {
-                    channelRepository.resetToDefaults()
-                    appPreferences.setFirstLaunchDone()
-                }
+        if (appPreferences.isFirstLaunch()) {
+            lifecycleScope.launch {
+                channelRepository.resetToDefaults()
+                appPreferences.setFirstLaunchDone()
             }
+        }
+
+        if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, ChannelBrowseFragment())
+                .replace(R.id.fragment_container, PlayerFragment(), "player")
                 .commit()
         }
     }
 
-    fun startPlayer(channelName: String) {
-        val intent = Intent(this, PlayerActivity::class.java)
-        intent.putExtra("channel_name", channelName)
-        startActivity(intent)
+    fun showSettings() {
+        val fragment = com.wangyg.tvliveplayer.ui.settings.SettingsFragment()
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack("settings")
+            .commit()
     }
 
-    override fun onBackPressed() {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - backPressedTime < backPressInterval) {
-            finish()
-        } else {
-            backPressedTime = currentTime
-            Toast.makeText(
-                this@MainActivity,
-                getString(R.string.exit_confirm),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+    fun showChannelEdit() {
+        val fragment = com.wangyg.tvliveplayer.ui.channel.ChannelEditFragment()
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack("channel_edit")
+            .commit()
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU) {
-            SettingsDialogFragment().show(supportFragmentManager, "SettingsDialog")
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (currentFragment is PlayerFragment) {
+                return currentFragment.handleKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
+            }
+            if (supportFragmentManager.backStackEntryCount > 0) {
+                playerViewModel.resetToPlayer()
+                supportFragmentManager.popBackStack()
+                return true
+            }
+            finish()
             return true
         }
-        return super.onKeyDown(keyCode, event)
-    }
 
-    override fun onDestroy() {
-        super.onDestroy()
+        if (currentFragment is PlayerFragment) {
+            return currentFragment.handleKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
+        }
+
+        return super.onKeyDown(keyCode, event)
     }
 }
