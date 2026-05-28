@@ -38,7 +38,10 @@ class TVPlayer @Inject constructor(private val context: Context) {
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     fun initialize(surfaceView: SurfaceView) {
-        release()
+        if (exoPlayer != null) {
+            exoPlayer?.setVideoSurfaceView(surfaceView)
+            return
+        }
         val okHttpClient = OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)

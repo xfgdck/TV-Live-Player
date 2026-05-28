@@ -40,7 +40,6 @@ class PlayerFragment : Fragment() {
     private lateinit var surfaceView: SurfaceView
     private lateinit var osdLayout: View
     private lateinit var tvChannelName: TextView
-    private lateinit var tvCategory: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var tvError: TextView
     private lateinit var btnRetry: Button
@@ -74,7 +73,6 @@ class PlayerFragment : Fragment() {
         surfaceView = view.findViewById(R.id.surface_view)
         osdLayout = view.findViewById(R.id.osd_layout)
         tvChannelName = view.findViewById(R.id.tv_channel_name)
-        tvCategory = view.findViewById(R.id.tv_category)
         progressBar = view.findViewById(R.id.progress_bar)
         tvError = view.findViewById(R.id.tv_error)
         btnRetry = view.findViewById(R.id.btn_retry)
@@ -188,10 +186,8 @@ class PlayerFragment : Fragment() {
     }
 
     private fun updateChannelInfo(state: PlayerUiState) {
-        val channel = state.currentChannel
-        if (channel != null) {
-            tvChannelName.text = channel.name
-            tvCategory.text = channel.category
+        if (state.currentChannel != null) {
+            tvChannelName.text = state.currentChannel.name
             osdLayout.visibility = View.VISIBLE
         } else {
             osdLayout.visibility = View.GONE
