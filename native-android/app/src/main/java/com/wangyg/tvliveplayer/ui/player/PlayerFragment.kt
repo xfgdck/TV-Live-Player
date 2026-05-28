@@ -60,6 +60,7 @@ class PlayerFragment : Fragment() {
     private val OSD_TIMEOUT_MS = 3000L
     private var exitConfirmRunnable: Runnable? = null
     private var isIconFocus = false
+    private var lastPlayedUrl: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -124,6 +125,12 @@ class PlayerFragment : Fragment() {
                     updateCategoryOverlay(state)
                     updateExitConfirm(state)
                     updateEmptyState(state)
+                    val url = state.currentChannel?.url
+                    if (url != null && url != lastPlayedUrl) {
+                        lastPlayedUrl = url
+                        tvError.visibility = View.GONE
+                        tvPlayer.play(url)
+                    }
                 }
             }
         }
@@ -156,6 +163,16 @@ class PlayerFragment : Fragment() {
                             tvEmptyGuide.visibility = View.VISIBLE
                         }
                     }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            tvPlayer.errorMessage.collect { msg ->
+                if (msg != null) {
+                    tvError.text = "播放失败: $msg"
+                } else {
+                    tvError.text = resources.getString(R.string.error_tip)
                 }
             }
         }
@@ -372,7 +389,10 @@ class PlayerFragment : Fragment() {
     }
 
     private fun enterIconSelect() {
-        if (viewModel.state.value.channels.isEmpty()) return
+        if (viewModel.state.value.channels.isEmpty()) {
+            (activity as? MainActivity)?.showSettings()
+            return
+        }
         isIconFocus = true
         iconSelectedIndex = 0
         iconPanel.visibility = View.VISIBLE

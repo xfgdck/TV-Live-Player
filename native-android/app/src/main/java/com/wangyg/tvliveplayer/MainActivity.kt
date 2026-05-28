@@ -2,6 +2,7 @@ package com.wangyg.tvliveplayer
 
 import android.os.Bundle
 import android.view.KeyEvent
+import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.activity.viewModels
@@ -63,7 +64,14 @@ class MainActivity : FragmentActivity() {
                 return currentFragment.handleKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
             }
             if (supportFragmentManager.backStackEntryCount > 0) {
-                playerViewModel.resetToPlayer()
+                val state = playerViewModel.state.value
+                if (state.channels.isEmpty() && state.channelsLoaded && supportFragmentManager.backStackEntryCount == 1) {
+                    Toast.makeText(this, "请先添加直播源", Toast.LENGTH_SHORT).show()
+                    return true
+                }
+                if (supportFragmentManager.backStackEntryCount == 1) {
+                    playerViewModel.resetToPlayer()
+                }
                 supportFragmentManager.popBackStack()
                 return true
             }

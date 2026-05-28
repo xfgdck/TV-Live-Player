@@ -50,9 +50,8 @@ class SettingsFragment : Fragment() {
                 .setPositiveButton("确定") { _, _ ->
                     lifecycleScope.launch {
                         channelRepository.clearAllChannels()
-                        Toast.makeText(requireContext(), "节目单已清空", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), "节目单已清空，请添加新的直播源", Toast.LENGTH_SHORT).show()
                         (activity as? MainActivity)?.playerViewModel?.resetToPlayer()
-                        requireActivity().onBackPressedDispatcher.onBackPressed()
                     }
                 }
                 .setNegativeButton("取消", null)
