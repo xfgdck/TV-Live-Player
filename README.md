@@ -1,244 +1,160 @@
+一、设计总则
+可用按键：上、下、左、右、OK、菜单、返回。音量加减不考虑。
 
-<p align="center">
-  <img src="native-android/app/src/main/res/drawable/ic_launcher_foreground.xml" width="120" height="120" alt="TV Live Player">
-</p>
+音量：由系统完全控制，软件内部无任何音量调节。
 
-<h1 align="center">万能电视直播</h1>
-<p align="center"><b>TV Live Player</b></p>
+界面层级：0级全屏直播 → 1级主菜单 → 2级功能界面 → 3级子界面，栈式导航。
 
-<p align="center">
-  <a href="#">
-    <img src="https://img.shields.io/badge/Android-5.1%2B-brightgreen" alt="Android 5.1+">
-  </a>
-  <a href="#">
-    <img src="https://img.shields.io/badge/Kotlin-2.0+-blue" alt="Kotlin 2.0+">
-  </a>
-  <a href="#">
-    <img src="https://img.shields.io/badge/API-22%2B-success" alt="API 22+">
-  </a>
-  <a href="#">
-    <img src="https://img.shields.io/badge/Leanback-Android%20TV-blueviolet" alt="Android TV">
-  </a>
-</p>
+频道记忆：每次换台立刻保存当前频道ID；启动自动恢复上次频道并播放。
 
----
+安装包：通用APK，兼容32/64位，Android 6 ~ 16。
 
-**万能电视直播** 是一款面向 **Android TV（电视盒子）** 的纯客户端全屏电视直播应用，完全使用 **遥控器操控**。支持 HLS 直播流播放、M3U 订阅、频道管理、备份恢复等完整功能。
+二、层级总览（调整后）
+层级	界面名称	说明
+0级	全屏直播界面	纯播放/分类频道选择两种状态，无收藏操作入口
+1级	主菜单界面	右侧竖排三个按钮：设置、节目编辑、收藏（带状态图标）
+2级	设置界面	直播源添加、软件更新
+2级	节目编辑界面	分类/频道管理，仅“我的收藏”分类下可取消收藏
+3级	直播源添加界面	导入文件、输入地址等
+3级	软件更新界面	检查更新与安装
+导航原则：按返回逐级退出；0级按返回提示二次确认退出。
 
-> 🏗️ **项目背景**：最初使用 React 19 + Vite 6 + Capacitor 6（WebView）方案开发，但在 Android 6 设备上存在严重的 WebView 兼容性问题（白屏、HLS 播放不稳定、焦点管理差）。后**迁移至原生 Android（Kotlin）**，彻底解决了兼容性问题，并获得了更佳的性能和遥控器导航体验。
+三、0级 – 全屏直播界面
+3.1 纯播放状态
+界面
 
-## ✨ 特性
+全屏视频，右上角可选频道名/台标水印。
 
-| 特性 | 说明 |
-|------|------|
-| 📺 **HLS 直播** | 基于 ExoPlayer（Media3）原生解码，支持 Android 5.1+ 全版本 |
-| 🎮 **遥控器操控** | Leanback 原生焦点管理，6键流畅导航 |
-| 📡 **M3U 订阅** | 预设源一键导入 / 在线链接 / 本地文件 / 文本粘贴 |
-| 📋 **频道管理** | 搜索、重命名、排序、删除、收藏 |
-| 📦 **备份恢复** | JSON 导入导出，数据迁移无忧 |
-| 🏠 **全屏沉浸** | 深色主题，大字体，适合客厅远距离观看 |
-| 📱 **体积小巧** | APK 仅约 3-5MB |
-| 🔄 **自动构建** | GitHub Actions 自动编译发布 |
+按键行为
 
-## 📷 界面预览
+按键	操作
+上 / 下	切换至上/下一个频道，保存频道并继续播放。
+左 / 右	进入分类频道选择状态（见3.2）。
+OK	暂停视频，并打开1级主菜单。
+菜单	不暂停视频，直接打开1级主菜单（视频继续播放）。
+返回	屏幕显示“再按一次返回键退出”。3秒内再按返回退出应用；其他按键或超时则取消提示。
+3.2 分类频道选择状态
+触发：纯播放状态按左/右。
 
-> 界面设计基于 Android TV Leanback 原生风格。
+界面
 
-- **频道浏览**：左侧分类导航 + 右侧频道卡片网格
-- **播放界面**：全屏视频 + 半透明 OSD 信息
-- **设置中心**：5 个 Tab 标签页（M3U订阅 / 手动添加 / 频道管理 / 源管理 / 备份恢复）
+底部半透明横向分类标签栏，左右排列，当前分类高亮。
 
-## 🎮 遥控器按键映射
+标签栏上方显示该分类频道列表，竖向排列，当前播放频道有白色粗边框标识，聚焦频道另有高亮。
 
-| 按键 | 浏览模式 | 播放模式 | 设置模式 |
-|------|---------|---------|---------|
-| **↑ ↓** | 频道列表上下移动 | 切换频道（上下一个） | 选项间移动 |
-| **← →** | 切换分类 | 快速切换分类 | Tab 切换 |
-| **OK/确认** | 进入播放器 | 显示/隐藏 OSD 信息 | 确认选择 |
-| **Menu** | 打开设置中心 | 打开设置中心 | 关闭设置 |
-| **Back** | 双击退出应用 | 回到浏览界面 | 关闭设置 |
+系统内置“我的收藏”分类，同样出现在标签栏。
 
-> OSD 信息（频道名 + 分类）在播放中按 OK 键显示，3 秒自动隐藏。
+频道条目不显示收藏图标，也没有任何收藏操作入口。
 
-## 🛠️ 技术栈
+按键
 
-| 类别 | 技术选型 | 版本 |
-|------|---------|------|
-| 开发语言 | Kotlin | 2.0+ |
-| 构建工具 | Gradle Kotlin DSL | 8.9 |
-| UI 框架 | AndroidX Leanback | 1.2.0 |
-| 视频播放 | Media3 ExoPlayer | 1.5.1 |
-| 架构模式 | MVVM + Clean Architecture | - |
-| 依赖注入 | Hilt | 2.53.1 |
-| 本地数据库 | Room | 2.6.1 |
-| 网络请求 | OkHttp | 4.12.0 |
-| JSON 解析 | Gson | 2.11.0 |
-| 图片加载 | Coil | 3.0.4 |
-| 异步框架 | Kotlin Coroutines + Flow | 1.9.0 |
-| 最低 SDK | API 22 (Android 5.1) | - |
-| 目标 SDK | API 34 (Android 14) | - |
+按键	行为
+左 / 右	切换分类，频道列表刷新，焦点停在第一个频道。
+上 / 下	移动频道焦点，高亮跟随。
+OK	跳转至焦点频道，播放并保存，返回纯播放状态。
+返回	取消选择，返回纯播放状态，继续播放原频道。
+菜单	无作用（移除原有收藏功能）。
+四、1级 – 主菜单界面（关键调整）
+进入方式
 
-## 📁 项目结构
+从0级纯播放状态按 OK（视频暂停）或 菜单（视频继续播放）进入。
 
-```
-TV-Live-Player/
-├── native-android/                  # 原生 Android 项目根目录
-│   ├── app/
-│   │   ├── src/main/
-│   │   │   ├── java/com/wangyg/tvliveplayer/
-│   │   │   │   ├── App.kt                    # Application 入口
-│   │   │   │   ├── MainActivity.kt           # 主 Activity
-│   │   │   │   ├── domain/                   # 领域层
-│   │   │   │   │   ├── model/                # Channel, Source 数据模型
-│   │   │   │   │   ├── repository/           # Repository 接口
-│   │   │   │   │   └── usecase/              # Use Case
-│   │   │   │   ├── data/                     # 数据层
-│   │   │   │   │   ├── local/                # Room 数据库
-│   │   │   │   │   ├── repository/           # Repository 实现
-│   │   │   │   │   └── preferences/          # SharedPreferences
-│   │   │   │   ├── ui/                       # UI 层
-│   │   │   │   │   ├── browse/               # 频道浏览 Fragment
-│   │   │   │   │   ├── player/               # 播放器 Activity
-│   │   │   │   │   └── settings/             # 设置中心
-│   │   │   │   ├── player/                   # ExoPlayer 封装
-│   │   │   │   └── parser/                   # M3U 解析器
-│   │   │   └── res/                          # 资源文件
-│   │   └── build.gradle.kts                  # 应用级构建配置
-│   ├── build.gradle.kts                      # 项目级构建配置
-│   ├── settings.gradle.kts                   # 项目设置
-│   ├── gradle.properties                     # Gradle 属性
-│   └── gradlew / gradlew.bat                 # Gradle 包装器
-├── .github/workflows/build-apk.yml           # GitHub Actions CI/CD
-├── .gitignore
-└── README.md
-```
+界面元素
 
-## 🏗️ 架构设计
+屏幕右侧半透明竖向面板，三个按钮从上到下依次为：
 
-### 三层 Clean Architecture
+设置
 
-依赖方向：**UI → Domain ← Data**（依赖倒置），Domain 层定义 Repository 接口，Data 层实现，UI 层通过 Hilt 注入。
+节目编辑
 
-```
-┌─────────────────────────────────────┐
-│     UI / Presentation Layer         │
-│  Activity · Fragment · ViewModel    │
-├─────────────────────────────────────┤
-│     Domain / UseCase Layer          │
-│  Repository 接口 · 业务逻辑 · 模型   │
-├─────────────────────────────────────┤
-│     Data Layer                      │
-│  Room DB · OkHttp · SharedPrefs     │
-└─────────────────────────────────────┘
-```
+收藏（动态图标 + 文字）
 
-### 📊 数据模型
+“收藏”按钮右侧显示当前播放频道的收藏状态图标：
 
-**Channel（频道）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | UUID | 唯一标识 |
-| name | String | 频道名称 |
-| url | String | HLS 直播流地址 |
-| category | String | 分类（如"CGTN国际"） |
-| logo | String? | 台标 URL |
-| tvgId | String? | EPG ID |
-| sortOrder | Int | 排序序号 |
-| isFavorite | Boolean | 是否收藏 |
+☆ 空心：未收藏，按钮文字显示 “添加收藏”
 
-**Source（M3U 订阅源）**
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | UUID | 唯一标识 |
-| name | String | 源名称 |
-| url | String | M3U 链接地址 |
-| isActive | Boolean | 是否启用 |
-| createdAt | Long | 创建时间戳 |
+★ 实心：已收藏，按钮文字显示 “取消收藏”
 
-### 📱 Android 6 兼容性策略
+焦点默认在“设置”。
 
-| 策略 | 说明 |
-|------|------|
-| **minSdkVersion** | API 22（Android 5.1），Android 6（API 23）完全覆盖 |
-| **ExoPlayer** | 基于原生 MediaCodec API，支持 Android 4.4+，不受 WebView 版本影响 |
-| **权限模型** | 联网权限安装即授权；文件选择使用 SAF，无需存储权限 |
-| **Desugaring** | 启用 coreLibraryDesugaring，Android 6 上可使用 java.time、Stream 等 Java 8+ API |
-| **Leanback** | 兼容 Android 5.0+，提供完整 TV 焦点管理 |
+按键行为
 
-## 🚀 快速开始
+按键	操作
+上 / 下	在三个按钮间移动焦点。
+OK（焦点在设置/节目编辑）	进入对应的2级界面，视频自动暂停。
+OK（焦点在收藏按钮）	切换当前频道收藏状态，不弹出任何界面。
+• 若未收藏 → 变为已收藏，图标切换为★，文字变为“取消收藏”，频道加入“我的收藏”分类。
+• 若已收藏 → 变为未收藏，图标切换为☆，文字变为“添加收藏”，频道从“我的收藏”分类移除。
+操作后视频状态保持不变（暂停或播放），数据即时保存。
+返回	关闭主菜单，返回0级纯播放状态。若由OK进入，返回后自动继续播放；若由菜单进入则保持原播放状态。
+菜单	等同于返回。
+设计说明
 
-### 本地构建
+收藏功能仅限此按钮操作，其他地方（0级分类选择、节目编辑非“我的收藏”分类）不再提供任何收藏/取消收藏入口。
 
-1. **环境要求**
-   - Android Studio (Ladybug+)
-   - JDK 17
-   - Android SDK (build-tools 34)
+按钮的图标和文字实时反映当前播放频道的收藏状态，进入菜单时即更新。
 
-2. **克隆并打开项目**
-   ```bash
-   git clone https://github.com/your-username/TV-Live-Player.git
-   cd TV-Live-Player/native-android
-   ```
+五、2级 – 设置界面
+无变化，界面与操作同上一版本：
 
-3. **使用 Android Studio**
-   - 打开 `native-android` 目录
-   - 等待 Gradle 同步完成
-   - 连接电视盒子或启动 Android TV 模拟器
-   - 点击运行 ▶️
+两个菜单项：直播源添加、软件更新。
 
-4. **命令行构建**
-   ```bash
-   # Debug APK
-   ./gradlew assembleDebug
-   
-   # Release APK (需配置签名)
-   ./gradlew assembleRelease
-   
-   # APK 输出路径
-   # app/build/outputs/apk/debug/app-debug.apk
-   # app/build/outputs/apk/release/app-release.apk
-   ```
+上/下选择，OK进入3级子界面，返回回到1级主菜单（焦点在设置）。
 
-### CI/CD (GitHub Actions)
+对应3级子界面（直播源添加、软件更新）保持不变。
 
-项目已配置 GitHub Actions 自动构建，每次 push 到 `main/master` 分支时会自动编译 APK：
+六、2级 – 节目编辑界面（仅允许在“我的收藏”中取消收藏）
+界面
 
-| 触发条件 | 行为 |
-|---------|------|
-| Push `main/master` | 自动构建 Debug APK |
-| 创建标签 `v*` | 构建 Debug + Release APK 并发布 Release |
-| 手动触发 | 在 Actions 页面点击 "Run workflow" |
+全屏，左侧分类列表，右侧频道列表。
 
-> **Release 签名**：需要在 GitHub Repository Secrets 中配置以下密钥：
-> - `KEYSTORE_BASE64`：签名文件 base64 编码
-> - `KEY_ALIAS`：别名
-> - `KEY_PASSWORD`：密钥密码
-> - `STORE_PASSWORD`：存储密码
+分类列表中包含所有真实分类 + 系统内置“我的收藏”分类（不可删除、重命名，置顶或末尾固定显示）。
 
-## 📜 默认频道
+频道列表中每个条目仅显示名称，不显示任何收藏图标。
 
-应用内置 12 个预设频道，分为 5 个分类：
+焦点默认在右侧第一个频道。
 
-| 分类 | 频道 |
-|------|------|
-| CGTN 国际 | CGTN, CGTN Documentary, CGTN Español, CGTN Français, CGTN العربية, CGTN Русский |
-| 纪录纪实 | NASA TV |
-| 海外新闻 | Newsmax, Al Jazeera English |
-| 体育运动 | Red Bull TV |
-| 演示测试 | Test 1, Test 2 |
+按键操作
 
-> 所有频道可通过设置中心的「M3U 订阅」功能任意添加和替换。
+按键	行为
+左 / 右	切换焦点区域（分类列表 ↔ 频道列表）。
+上 / 下	移动当前区域内的焦点。
+OK（焦点在频道）	进入移动模式：频道边框闪烁，上下移动位置，OK确认，返回取消。
+菜单（焦点在频道）	弹出频道操作菜单，内容取决于当前所属分类：
+• 普通分类：
+- 删除
+- 移动到其他分类
+（无收藏选项）
+• “我的收藏”分类：
+- 取消收藏（选择后直接将该频道移出收藏，数据即时保存，频道从列表中消失）
+- （可选）删除（从全局列表删除，慎用）
+菜单（焦点在分类）	弹出分类操作菜单：
+• 普通分类：添加分类、重命名、删除、移动顺序。
+• “我的收藏”分类：提示“系统分类，不可编辑”或直接无菜单弹出。
+返回	保存所有操作（已即时保存），返回1级主菜单，焦点留在“节目编辑”。
+要点
 
-## 📝 许可证
+只有在左侧选择“我的收藏”分类后，右侧频道列表上通过菜单键才可出现“取消收藏”功能，这是唯一允许批量取消收藏的地方。
 
-本项目仅供个人学习和研究使用。
+其他任何界面均无添加收藏的功能，添加收藏只能通过主菜单的收藏按钮作用于当前播放频道。
 
-## 🤝 贡献
+七、收藏行为的全局影响
+“我的收藏”是一个虚拟分类，出现在0级分类选择标签栏和节目编辑分类列表中。
 
-欢迎提交 Issue 和 Pull Request！
+0级上/下切换频道仍基于全局顺序，收藏操作不影响原有切台逻辑。
 
----
+所有收藏状态变更（主菜单按钮、节目编辑中取消收藏）均即时写入本地存储，确保数据一致。
 
-<p align="center">
-  <sub>Built with ❤️ for Android TV</sub>
-</p>
+八、启动恢复与持久化
+启动读取最后频道ID并播放，若ID失效则播放第一个频道。
+
+每次频道切换、收藏状态变更、节目编辑操作均立即保存。
+
+数据结构需存储全局频道列表、分类结构、每个频道的收藏标记。
+
+九、兼容性
+单APK包含32/64位库。
+
+最低API 23 (Android 6)，目标兼容Android 16。
+
+按键映射使用标准键值，确保通用遥控器可用。
