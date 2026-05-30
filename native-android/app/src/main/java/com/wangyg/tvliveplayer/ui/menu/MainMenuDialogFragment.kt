@@ -150,7 +150,7 @@ class MainMenuDialogFragment : DialogFragment() {
                 }
                 true
             }
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_MENU -> {
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
                 viewModel.closeMenu()
                 dismiss()
                 true

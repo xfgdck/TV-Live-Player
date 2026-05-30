@@ -217,7 +217,7 @@ class ChannelEditFragment : Fragment() {
                 }
                 true
             }
-            KeyEvent.KEYCODE_MENU -> {
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
                 if (focusArea == FOCUS_CHANNEL && channels.isNotEmpty()) {
                     showChannelMenu()
                 } else if (focusArea == FOCUS_CATEGORY && categories.isNotEmpty()) {

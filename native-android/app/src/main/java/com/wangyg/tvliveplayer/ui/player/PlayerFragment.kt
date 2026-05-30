@@ -357,9 +357,8 @@ class PlayerFragment : Fragment() {
             }
             override fun onLongPress(e: MotionEvent) {
                 if (!isIconFocus && viewModel.state.value.screenStack.lastOrNull() == Screen.PLAYER) {
-                    val state = viewModel.state.value
-                    if (state.channels.isNotEmpty()) {
-                        togglePlayPause()
+                    if (viewModel.state.value.channels.isNotEmpty()) {
+                        enterIconSelect()
                     }
                 }
             }
@@ -386,14 +385,14 @@ class PlayerFragment : Fragment() {
     private fun handlePlayerKey(keyCode: Int): Boolean {
         val state = viewModel.state.value
         if (state.channels.isEmpty()) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_MENU) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_ALL_APPS) {
                 enterIconSelect()
                 return true
             }
             return false
         }
         if (state.showExitConfirm) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
                 requireActivity().finish()
                 return true
             }
@@ -420,7 +419,7 @@ class PlayerFragment : Fragment() {
                 enterIconSelect()
                 true
             }
-            KeyEvent.KEYCODE_MENU -> {
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
                 enterIconSelect()
                 true
             }
@@ -478,7 +477,7 @@ class PlayerFragment : Fragment() {
                 exitIconSelect()
                 true
             }
-            KeyEvent.KEYCODE_MENU -> {
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
                 true
             }
             else -> false
@@ -569,7 +568,7 @@ class PlayerFragment : Fragment() {
                 viewModel.cancelCategorySelect()
                 true
             }
-            KeyEvent.KEYCODE_MENU -> {
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
                 true
             }
             else -> false
