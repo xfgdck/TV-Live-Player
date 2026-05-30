@@ -91,7 +91,17 @@ class PlayerViewModel @Inject constructor(
                     val currentId = stateVal.currentChannel?.id
                     val channelStillExists = currentId != null && list.any { it.id == currentId }
 
-                    if (!channelStillExists && list.isNotEmpty()) {
+                    if (list.isEmpty()) {
+                        _state.update {
+                            it.copy(
+                                channels = list,
+                                allCategories = cats,
+                                currentChannel = null,
+                                currentIndex = 0,
+                                isFavorite = false
+                            )
+                        }
+                    } else if (!channelStillExists) {
                         val newChannel = list.first()
                         val newIdx = 0
                         val newIsFav = repository.isFavorite(newChannel.id)
@@ -107,7 +117,7 @@ class PlayerViewModel @Inject constructor(
                         }
                         saveLastChannel(newChannel)
                     } else {
-                        val isFav = if (currentId != null && channelStillExists) repository.isFavorite(currentId) else false
+                        val isFav = repository.isFavorite(currentId!!)
                         _state.update {
                             it.copy(
                                 channels = list,

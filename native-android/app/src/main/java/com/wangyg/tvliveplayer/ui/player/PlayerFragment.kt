@@ -141,6 +141,11 @@ class PlayerFragment : Fragment() {
                         lastPlayedUrl = url
                         tvError.visibility = View.GONE
                         tvPlayer.play(url)
+                    } else if (state.currentChannel == null && lastPlayedUrl != null) {
+                        lastPlayedUrl = null
+                        ivPause.visibility = View.GONE
+                        tvPlayer.release()
+                        tvPlayer.initialize(surfaceView)
                     }
                     if (state.channels.isEmpty() && state.channelsLoaded && !redirectingToSourceMgmt) {
                         redirectingToSourceMgmt = true
@@ -407,11 +412,11 @@ class PlayerFragment : Fragment() {
                 showOsdTemp()
                 true
             }
-            KeyEvent.KEYCODE_DPAD_LEFT -> {
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 viewModel.enterCategorySelect()
                 true
             }
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 enterIconSelect()
                 true
             }
@@ -581,11 +586,9 @@ class PlayerFragment : Fragment() {
         if (tvPlayer.isPlaying()) {
             tvPlayer.pause()
             ivPause.visibility = View.VISIBLE
-            Toast.makeText(requireContext(), "已暂停", Toast.LENGTH_SHORT).show()
         } else {
             tvPlayer.resume()
             ivPause.visibility = View.GONE
-            Toast.makeText(requireContext(), "继续播放", Toast.LENGTH_SHORT).show()
         }
     }
 
