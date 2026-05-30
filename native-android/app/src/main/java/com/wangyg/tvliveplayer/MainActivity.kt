@@ -67,7 +67,7 @@ class MainActivity : FragmentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
             val state = playerViewModel.state.value
             if (state.channels.isEmpty() && state.channelsLoaded) {
                 Toast.makeText(this, "请先添加直播源", Toast.LENGTH_SHORT).show()

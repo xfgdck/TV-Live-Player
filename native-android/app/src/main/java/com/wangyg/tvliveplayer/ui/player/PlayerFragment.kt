@@ -350,6 +350,14 @@ class PlayerFragment : Fragment() {
                 enterIconSelect()
                 return true
             }
+            override fun onLongPress(e: MotionEvent) {
+                if (!isIconFocus && viewModel.state.value.screenStack.lastOrNull() == Screen.PLAYER) {
+                    val state = viewModel.state.value
+                    if (state.channels.isNotEmpty()) {
+                        togglePlayPause()
+                    }
+                }
+            }
         })
         view?.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
@@ -411,7 +419,11 @@ class PlayerFragment : Fragment() {
                 enterIconSelect()
                 true
             }
-            KeyEvent.KEYCODE_BACK -> {
+            KeyEvent.KEYCODE_SPACE -> {
+                togglePlayPause()
+                true
+            }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 if (viewModel.state.value.showExitConfirm) {
                     requireActivity().finish()
                 } else {
@@ -457,7 +469,7 @@ class PlayerFragment : Fragment() {
                 onIconAction(iconSelectedIndex)
                 true
             }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BACK -> {
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 exitIconSelect()
                 true
             }
@@ -548,7 +560,7 @@ class PlayerFragment : Fragment() {
                 viewModel.confirmCategorySelect()
                 true
             }
-            KeyEvent.KEYCODE_BACK -> {
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 viewModel.cancelCategorySelect()
                 true
             }
@@ -563,6 +575,18 @@ class PlayerFragment : Fragment() {
         osdLayout.visibility = View.VISIBLE
         osdHandler.removeCallbacksAndMessages(null)
         osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
+    }
+
+    private fun togglePlayPause() {
+        if (tvPlayer.isPlaying()) {
+            tvPlayer.pause()
+            ivPause.visibility = View.VISIBLE
+            Toast.makeText(requireContext(), "已暂停", Toast.LENGTH_SHORT).show()
+        } else {
+            tvPlayer.resume()
+            ivPause.visibility = View.GONE
+            Toast.makeText(requireContext(), "继续播放", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onPause() {
