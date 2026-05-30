@@ -48,6 +48,14 @@ class MainActivity : FragmentActivity() {
             .commit()
     }
 
+    fun showSourceMgmt() {
+        val fragment = com.wangyg.tvliveplayer.ui.settings.SourceMgmtFragment()
+        supportFragmentManager.beginTransaction()
+            .add(R.id.fragment_container, fragment, "source_mgmt")
+            .addToBackStack("source_mgmt")
+            .commit()
+    }
+
     fun showChannelEdit() {
         val fragment = com.wangyg.tvliveplayer.ui.channel.ChannelEditFragment()
         supportFragmentManager.beginTransaction()
@@ -60,15 +68,15 @@ class MainActivity : FragmentActivity() {
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            val state = playerViewModel.state.value
+            if (state.channels.isEmpty() && state.channelsLoaded) {
+                Toast.makeText(this, "请先添加直播源", Toast.LENGTH_SHORT).show()
+                return true
+            }
             if (currentFragment is PlayerFragment) {
                 return currentFragment.handleKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
             }
             if (supportFragmentManager.backStackEntryCount > 0) {
-                val state = playerViewModel.state.value
-                if (state.channels.isEmpty() && state.channelsLoaded && supportFragmentManager.backStackEntryCount == 1) {
-                    Toast.makeText(this, "请先添加直播源", Toast.LENGTH_SHORT).show()
-                    return true
-                }
                 if (supportFragmentManager.backStackEntryCount == 1) {
                     playerViewModel.resetToPlayer()
                 }

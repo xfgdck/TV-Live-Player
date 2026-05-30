@@ -124,6 +124,17 @@
             android:focusable="true"
             android:clickable="true" />
         <ImageButton
+            android:id="@+id/btn_icon_source"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:src="@drawable/ic_source"
+            android:background="@drawable/menu_item_bg"
+            android:scaleType="centerInside"
+            android:padding="10dp"
+            android:focusable="true"
+            android:clickable="true" />
+        <ImageButton
             android:id="@+id/btn_icon_edit"
             android:layout_width="48dp"
             android:layout_height="48dp"
@@ -159,6 +170,7 @@
         android:visibility="gone">
 
         <ScrollView
+            android:id="@+id/category_scroll"
             android:layout_width="match_parent"
             android:layout_height="240dp"
             android:paddingStart="32dp"

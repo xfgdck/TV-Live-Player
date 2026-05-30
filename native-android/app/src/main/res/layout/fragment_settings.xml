@@ -23,43 +23,15 @@
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/btn_add_source"
+            android:id="@+id/btn_update"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="16dp"
             android:background="@drawable/menu_item_bg"
             android:gravity="center_vertical"
             android:paddingStart="16dp"
-            android:text="直播源添加"
-            android:textColor="@color/text_primary"
-            android:textSize="18sp"
-            android:focusable="true"
-            android:clickable="true" />
-
-        <TextView
-            android:id="@+id/btn_update"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
             android:text="软件更新"
             android:textColor="@color/text_primary"
-            android:textSize="18sp"
-            android:focusable="true"
-            android:clickable="true" />
-
-        <TextView
-            android:id="@+id/btn_clear"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:text="一键清空节目单"
-            android:textColor="@color/error_color"
             android:textSize="18sp"
             android:focusable="true"
             android:clickable="true" />

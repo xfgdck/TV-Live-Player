@@ -1,0 +1,78 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="500dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@color/surface"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="直播源管理"
+            android:textColor="@color/accent"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_url"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/menu_item_bg"
+            android:gravity="center"
+            android:text="在线链接解析"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:focusable="true"
+            android:clickable="true" />
+
+        <TextView
+            android:id="@+id/btn_file"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/menu_item_bg"
+            android:gravity="center"
+            android:text="从文件添加"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:focusable="true"
+            android:clickable="true" />
+
+        <TextView
+            android:id="@+id/btn_manual"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/menu_item_bg"
+            android:gravity="center"
+            android:text="手动添加频道"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:focusable="true"
+            android:clickable="true" />
+
+        <TextView
+            android:id="@+id/btn_clear"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/menu_item_bg"
+            android:gravity="center"
+            android:text="清空节目单"
+            android:textColor="@color/error_color"
+            android:textSize="16sp"
+            android:focusable="true"
+            android:clickable="true" />
+
+    </LinearLayout>
+
+</FrameLayout>

@@ -15,6 +15,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -49,10 +50,12 @@ class PlayerFragment : Fragment() {
     private lateinit var tvEmptyGuide: TextView
     private lateinit var tvExitConfirm: TextView
     private lateinit var categoryOverlay: View
+    private lateinit var categoryScroll: ScrollView
     private lateinit var categoryChannelList: LinearLayout
     private lateinit var categoryTabs: LinearLayout
     private lateinit var iconPanel: View
     private lateinit var btnIconSettings: ImageButton
+    private lateinit var btnIconSource: ImageButton
     private lateinit var btnIconEdit: ImageButton
     private lateinit var btnIconFavorite: ImageButton
 
@@ -62,6 +65,7 @@ class PlayerFragment : Fragment() {
     private var exitConfirmRunnable: Runnable? = null
     private var isIconFocus = false
     private var lastPlayedUrl: String? = null
+    private var redirectingToSourceMgmt = false
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -83,10 +87,12 @@ class PlayerFragment : Fragment() {
         tvEmptyGuide = view.findViewById(R.id.tv_empty_guide)
         tvExitConfirm = view.findViewById(R.id.tv_exit_confirm)
         categoryOverlay = view.findViewById(R.id.category_overlay)
+        categoryScroll = view.findViewById(R.id.category_scroll)
         categoryChannelList = view.findViewById(R.id.category_channel_list)
         categoryTabs = view.findViewById(R.id.category_tabs)
         iconPanel = view.findViewById(R.id.icon_panel)
         btnIconSettings = view.findViewById(R.id.btn_icon_settings)
+        btnIconSource = view.findViewById(R.id.btn_icon_source)
         btnIconEdit = view.findViewById(R.id.btn_icon_edit)
         btnIconFavorite = view.findViewById(R.id.btn_icon_favorite)
 
@@ -94,17 +100,21 @@ class PlayerFragment : Fragment() {
         setupTouch()
 
         btnIconSettings.setOnClickListener { onIconAction(0) }
-        btnIconEdit.setOnClickListener { onIconAction(1) }
-        btnIconFavorite.setOnClickListener { onIconAction(2) }
+        btnIconSource.setOnClickListener { onIconAction(1) }
+        btnIconEdit.setOnClickListener { onIconAction(2) }
+        btnIconFavorite.setOnClickListener { onIconAction(3) }
 
         btnIconSettings.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) iconSelectedIndex = 0
         }
-        btnIconEdit.setOnFocusChangeListener { _, hasFocus ->
+        btnIconSource.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) iconSelectedIndex = 1
         }
-        btnIconFavorite.setOnFocusChangeListener { _, hasFocus ->
+        btnIconEdit.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) iconSelectedIndex = 2
+        }
+        btnIconFavorite.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) iconSelectedIndex = 3
         }
 
         btnRetry.setOnClickListener {
@@ -131,6 +141,13 @@ class PlayerFragment : Fragment() {
                         lastPlayedUrl = url
                         tvError.visibility = View.GONE
                         tvPlayer.play(url)
+                    }
+                    if (state.channels.isEmpty() && state.channelsLoaded && !redirectingToSourceMgmt) {
+                        redirectingToSourceMgmt = true
+                        Toast.makeText(context, "暂无频道，请添加直播源", Toast.LENGTH_SHORT).show()
+                        (activity as? MainActivity)?.showSourceMgmt()
+                    } else if (state.channels.isNotEmpty()) {
+                        redirectingToSourceMgmt = false
                     }
                 }
             }
@@ -282,6 +299,16 @@ class PlayerFragment : Fragment() {
                 }
                 categoryChannelList.addView(item)
             }
+            categoryScroll.post {
+                val focused = categoryChannelList.getChildAt(state.selectedChannelIndex) ?: return@post
+                val scrollY = categoryScroll.scrollY
+                val viewHeight = categoryScroll.height
+                if (focused.top < scrollY) {
+                    categoryScroll.smoothScrollTo(0, focused.top)
+                } else if (focused.bottom > scrollY + viewHeight) {
+                    categoryScroll.smoothScrollTo(0, focused.bottom - viewHeight)
+                }
+            }
         }
     }
 
@@ -398,7 +425,7 @@ class PlayerFragment : Fragment() {
 
     private fun enterIconSelect() {
         if (viewModel.state.value.channels.isEmpty()) {
-            (activity as? MainActivity)?.showSettings()
+            (activity as? MainActivity)?.showSourceMgmt()
             return
         }
         isIconFocus = true
@@ -417,12 +444,12 @@ class PlayerFragment : Fragment() {
     private fun handleIconKey(keyCode: Int): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
-                iconSelectedIndex = (iconSelectedIndex - 1 + 3) % 3
+                iconSelectedIndex = (iconSelectedIndex - 1 + 4) % 4
                 focusIconItem(iconSelectedIndex)
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                iconSelectedIndex = (iconSelectedIndex + 1) % 3
+                iconSelectedIndex = (iconSelectedIndex + 1) % 4
                 focusIconItem(iconSelectedIndex)
                 true
             }
@@ -444,8 +471,9 @@ class PlayerFragment : Fragment() {
     private fun focusIconItem(index: Int) {
         when (index) {
             0 -> btnIconSettings.requestFocus()
-            1 -> btnIconEdit.requestFocus()
-            2 -> btnIconFavorite.requestFocus()
+            1 -> btnIconSource.requestFocus()
+            2 -> btnIconEdit.requestFocus()
+            3 -> btnIconFavorite.requestFocus()
         }
     }
 
@@ -456,10 +484,14 @@ class PlayerFragment : Fragment() {
                 isIconFocus = false
             }
             1 -> {
-                (activity as? MainActivity)?.showChannelEdit()
+                (activity as? MainActivity)?.showSourceMgmt()
                 isIconFocus = false
             }
             2 -> {
+                (activity as? MainActivity)?.showChannelEdit()
+                isIconFocus = false
+            }
+            3 -> {
                 val state = viewModel.state.value
                 val before = state.isFavorite
                 viewModel.toggleFavorite()
@@ -475,25 +507,41 @@ class PlayerFragment : Fragment() {
     private fun handleCategoryKey(keyCode: Int): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                val newIdx = viewModel.state.value.selectedCategoryIndex - 1
-                if (newIdx >= 0) viewModel.selectCategory(newIdx)
+                val cur = viewModel.state.value.selectedCategoryIndex
+                if (cur > 0) {
+                    viewModel.selectCategory(cur - 1)
+                } else {
+                    Toast.makeText(context, "已是第一个分类", Toast.LENGTH_SHORT).show()
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 val cats = viewModel.state.value.allCategories
-                val newIdx = viewModel.state.value.selectedCategoryIndex + 1
-                if (newIdx < cats.size) viewModel.selectCategory(newIdx)
+                val cur = viewModel.state.value.selectedCategoryIndex
+                if (cur < cats.size - 1) {
+                    viewModel.selectCategory(cur + 1)
+                } else {
+                    Toast.makeText(context, "已是最后一个分类", Toast.LENGTH_SHORT).show()
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
-                val newIdx = viewModel.state.value.selectedChannelIndex - 1
-                if (newIdx >= 0) viewModel.focusCategoryChannel(newIdx)
+                val cur = viewModel.state.value.selectedChannelIndex
+                if (cur > 0) {
+                    viewModel.focusCategoryChannel(cur - 1)
+                } else {
+                    Toast.makeText(context, "已是第一个频道", Toast.LENGTH_SHORT).show()
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 val chs = viewModel.state.value.categoryChannels
-                val newIdx = viewModel.state.value.selectedChannelIndex + 1
-                if (newIdx < chs.size) viewModel.focusCategoryChannel(newIdx)
+                val cur = viewModel.state.value.selectedChannelIndex
+                if (cur < chs.size - 1) {
+                    viewModel.focusCategoryChannel(cur + 1)
+                } else {
+                    Toast.makeText(context, "已是最后一个频道", Toast.LENGTH_SHORT).show()
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {

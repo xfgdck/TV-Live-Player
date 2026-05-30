@@ -20,6 +20,7 @@ enum class Screen {
     ICON_SELECT,
     MENU,
     SETTINGS,
+    SOURCE_MGMT,
     CHANNEL_EDIT,
     ADD_SOURCE,
     UPDATE
@@ -88,13 +89,32 @@ class PlayerViewModel @Inject constructor(
                     }
                 } else {
                     val currentId = stateVal.currentChannel?.id
-                    val isFav = if (currentId != null) repository.isFavorite(currentId) else false
-                    _state.update {
-                        it.copy(
-                            channels = list,
-                            allCategories = cats,
-                            isFavorite = isFav
-                        )
+                    val channelStillExists = currentId != null && list.any { it.id == currentId }
+
+                    if (!channelStillExists && list.isNotEmpty()) {
+                        val newChannel = list.first()
+                        val newIdx = 0
+                        val newIsFav = repository.isFavorite(newChannel.id)
+                        _state.update {
+                            it.copy(
+                                channels = list,
+                                allCategories = cats,
+                                currentChannel = newChannel,
+                                currentIndex = newIdx,
+                                isFavorite = newIsFav,
+                                channelsLoaded = true
+                            )
+                        }
+                        saveLastChannel(newChannel)
+                    } else {
+                        val isFav = if (currentId != null && channelStillExists) repository.isFavorite(currentId) else false
+                        _state.update {
+                            it.copy(
+                                channels = list,
+                                allCategories = cats,
+                                isFavorite = isFav
+                            )
+                        }
                     }
                 }
             }

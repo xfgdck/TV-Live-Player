@@ -36,6 +36,18 @@
             android:src="@drawable/ic_settings" />
 
         <ImageButton
+            android:id="@+id/btn_source_mgmt"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/menu_item_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_source" />
+
+        <ImageButton
             android:id="@+id/btn_channel_edit"
             android:layout_width="60dp"
             android:layout_height="60dp"

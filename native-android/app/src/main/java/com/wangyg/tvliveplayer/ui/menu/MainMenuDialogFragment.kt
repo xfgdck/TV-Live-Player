@@ -21,7 +21,7 @@ class MainMenuDialogFragment : DialogFragment() {
     private val viewModel: PlayerViewModel by viewModels(ownerProducer = { requireActivity() })
 
     private var selectedIndex = 0
-    private val menuCount = 3
+    private val menuCount = 4
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = Dialog(requireActivity(), android.R.style.Theme_Black_NoTitleBar_Fullscreen)
@@ -29,6 +29,7 @@ class MainMenuDialogFragment : DialogFragment() {
         dialog.setContentView(R.layout.fragment_main_menu)
 
         val btnSettings = dialog.findViewById<ImageButton>(R.id.btn_settings)
+        val btnSourceMgmt = dialog.findViewById<ImageButton>(R.id.btn_source_mgmt)
         val btnChannelEdit = dialog.findViewById<ImageButton>(R.id.btn_channel_edit)
         val btnFavorite = dialog.findViewById<ImageButton>(R.id.btn_favorite)
         val tvChannelInfo = dialog.findViewById<TextView>(R.id.tv_menu_channel_info)
@@ -39,6 +40,11 @@ class MainMenuDialogFragment : DialogFragment() {
         btnSettings.setOnClickListener {
             viewModel.navigateTo(Screen.SETTINGS)
             (activity as? MainActivity)?.showSettings()
+            dialog.dismiss()
+        }
+        btnSourceMgmt.setOnClickListener {
+            viewModel.navigateTo(Screen.SOURCE_MGMT)
+            (activity as? MainActivity)?.showSourceMgmt()
             dialog.dismiss()
         }
         btnChannelEdit.setOnClickListener {
@@ -62,11 +68,14 @@ class MainMenuDialogFragment : DialogFragment() {
         btnSettings.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) selectedIndex = 0
         }
-        btnChannelEdit.setOnFocusChangeListener { _, hasFocus ->
+        btnSourceMgmt.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) selectedIndex = 1
         }
-        btnFavorite.setOnFocusChangeListener { _, hasFocus ->
+        btnChannelEdit.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) selectedIndex = 2
+        }
+        btnFavorite.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) selectedIndex = 3
         }
 
         dialog.setOnKeyListener { _, keyCode, event ->
@@ -86,6 +95,14 @@ class MainMenuDialogFragment : DialogFragment() {
         selectedIndex = 0
         dialog?.findViewById<TextView>(R.id.tv_menu_channel_info)?.let { updateChannelInfo(it) }
         dialog?.findViewById<ImageButton>(R.id.btn_favorite)?.let { updateFavoriteIcon(it) }
+    }
+
+    private fun getMenuItemId(index: Int): Int = when (index) {
+        0 -> R.id.btn_settings
+        1 -> R.id.btn_source_mgmt
+        2 -> R.id.btn_channel_edit
+        3 -> R.id.btn_favorite
+        else -> R.id.btn_settings
     }
 
     private fun handleKey(keyCode: Int): Boolean {
@@ -109,11 +126,16 @@ class MainMenuDialogFragment : DialogFragment() {
                         dismiss()
                     }
                     1 -> {
+                        viewModel.navigateTo(Screen.SOURCE_MGMT)
+                        (activity as? MainActivity)?.showSourceMgmt()
+                        dismiss()
+                    }
+                    2 -> {
                         viewModel.navigateTo(Screen.CHANNEL_EDIT)
                         (activity as? MainActivity)?.showChannelEdit()
                         dismiss()
                     }
-                    2 -> {
+                    3 -> {
                         val state = viewModel.state.value
                         val before = state.isFavorite
                         viewModel.toggleFavorite()
@@ -138,11 +160,7 @@ class MainMenuDialogFragment : DialogFragment() {
     }
 
     private fun updateFocus(dialog: Dialog) {
-        when (selectedIndex) {
-            0 -> dialog.findViewById<ImageButton>(R.id.btn_settings)?.requestFocus()
-            1 -> dialog.findViewById<ImageButton>(R.id.btn_channel_edit)?.requestFocus()
-            2 -> dialog.findViewById<ImageButton>(R.id.btn_favorite)?.requestFocus()
-        }
+        dialog.findViewById<ImageButton>(getMenuItemId(selectedIndex))?.requestFocus()
     }
 
     private fun updateFavoriteIcon(btn: ImageButton) {
