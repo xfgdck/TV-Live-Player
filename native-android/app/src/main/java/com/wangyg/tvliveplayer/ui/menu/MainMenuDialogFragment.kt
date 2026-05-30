@@ -47,11 +47,7 @@ class MainMenuDialogFragment : DialogFragment() {
             (activity as? MainActivity)?.showSourceMgmt()
             dialog.dismiss()
         }
-        btnChannelEdit.setOnClickListener {
-            viewModel.navigateTo(Screen.CHANNEL_EDIT)
-            (activity as? MainActivity)?.showChannelEdit()
-            dialog.dismiss()
-        }
+        btnChannelEdit.visibility = View.GONE
         btnFavorite.setOnClickListener {
             val state = viewModel.state.value
             val before = state.isFavorite
@@ -131,8 +127,6 @@ class MainMenuDialogFragment : DialogFragment() {
                         dismiss()
                     }
                     2 -> {
-                        viewModel.navigateTo(Screen.CHANNEL_EDIT)
-                        (activity as? MainActivity)?.showChannelEdit()
                         dismiss()
                     }
                     3 -> {

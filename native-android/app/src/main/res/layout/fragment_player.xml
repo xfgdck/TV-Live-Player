@@ -2,7 +2,9 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:keepScreenOn="true">
+    android:keepScreenOn="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
 
     <SurfaceView
         android:id="@+id/surface_view"
@@ -129,17 +131,6 @@
             android:layout_height="48dp"
             android:layout_marginTop="6dp"
             android:src="@drawable/ic_source"
-            android:background="@drawable/menu_item_bg"
-            android:scaleType="centerInside"
-            android:padding="10dp"
-            android:focusable="true"
-            android:clickable="true" />
-        <ImageButton
-            android:id="@+id/btn_icon_edit"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="6dp"
-            android:src="@drawable/ic_edit"
             android:background="@drawable/menu_item_bg"
             android:scaleType="centerInside"
             android:padding="10dp"

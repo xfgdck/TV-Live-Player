@@ -217,6 +217,7 @@ class PlayerViewModel @Inject constructor(
         if (chs.isNotEmpty() && idx < chs.size) {
             playChannel(chs[idx])
         }
+        _state.update { it.copy(screenStack = listOf(Screen.PLAYER)) }
     }
 
     fun resetToPlayer() {
@@ -297,6 +298,36 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val isFav = repository.toggleFavorite(channel.id)
             _state.update { it.copy(isFavorite = isFav) }
+        }
+    }
+
+    fun deleteCategoryChannel(index: Int) {
+        val chs = _state.value.categoryChannels
+        if (index < 0 || index >= chs.size) return
+        viewModelScope.launch {
+            repository.deleteChannel(chs[index])
+            val cat = _state.value.allCategories.getOrNull(_state.value.selectedCategoryIndex)
+            if (cat != null) {
+                val updated = repository.getChannelsByCategory(cat).first()
+                val newIdx = if (index >= updated.size) updated.size - 1 else index
+                _state.update { it.copy(categoryChannels = updated, selectedChannelIndex = newIdx.coerceAtLeast(0)) }
+            }
+            refreshAll()
+        }
+    }
+
+    fun moveCategoryChannel(index: Int, targetCategory: String) {
+        val chs = _state.value.categoryChannels
+        if (index < 0 || index >= chs.size) return
+        viewModelScope.launch {
+            repository.updateChannel(chs[index].copy(category = targetCategory))
+            val cat = _state.value.allCategories.getOrNull(_state.value.selectedCategoryIndex)
+            if (cat != null) {
+                val updated = repository.getChannelsByCategory(cat).first()
+                val newIdx = if (index >= updated.size) updated.size - 1 else index
+                _state.update { it.copy(categoryChannels = updated, selectedChannelIndex = newIdx.coerceAtLeast(0)) }
+            }
+            refreshAll()
         }
     }
 

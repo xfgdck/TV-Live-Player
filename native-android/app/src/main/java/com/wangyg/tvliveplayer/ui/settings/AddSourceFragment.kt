@@ -16,7 +16,12 @@ import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import com.wangyg.tvliveplayer.domain.usecase.ParseAndImportM3UUseCase
 import com.wangyg.tvliveplayer.parser.M3UParser
 import dagger.hilt.android.AndroidEntryPoint
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import javax.inject.Inject
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -113,7 +118,7 @@ class AddSourceFragment : Fragment() {
     private fun downloadAndParse(url: String) {
         lifecycleScope.launch {
             try {
-                val client = okhttp3.OkHttpClient()
+                val client = buildUnsafeOkHttpClient()
                 val request = okhttp3.Request.Builder().url(url).build()
                 val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: return@launch
@@ -123,5 +128,19 @@ class AddSourceFragment : Fragment() {
                 Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun buildUnsafeOkHttpClient(): okhttp3.OkHttpClient {
+        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, trustAllCerts, SecureRandom())
+        return okhttp3.OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            .hostnameVerifier { _, _ -> true }
+            .build()
     }
 }

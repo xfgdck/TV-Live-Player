@@ -1,5 +1,6 @@
 package com.wangyg.tvliveplayer.ui.player
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -26,6 +27,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.wangyg.tvliveplayer.MainActivity
 import com.wangyg.tvliveplayer.R
 import com.wangyg.tvliveplayer.domain.model.Channel
+import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import com.wangyg.tvliveplayer.player.PlaybackState
 import com.wangyg.tvliveplayer.player.TVPlayer
 import dagger.hilt.android.AndroidEntryPoint
@@ -56,7 +58,6 @@ class PlayerFragment : Fragment() {
     private lateinit var iconPanel: View
     private lateinit var btnIconSettings: ImageButton
     private lateinit var btnIconSource: ImageButton
-    private lateinit var btnIconEdit: ImageButton
     private lateinit var btnIconFavorite: ImageButton
 
     private val osdHandler = Handler(Looper.getMainLooper())
@@ -93,7 +94,6 @@ class PlayerFragment : Fragment() {
         iconPanel = view.findViewById(R.id.icon_panel)
         btnIconSettings = view.findViewById(R.id.btn_icon_settings)
         btnIconSource = view.findViewById(R.id.btn_icon_source)
-        btnIconEdit = view.findViewById(R.id.btn_icon_edit)
         btnIconFavorite = view.findViewById(R.id.btn_icon_favorite)
 
         tvPlayer.initialize(surfaceView)
@@ -101,8 +101,7 @@ class PlayerFragment : Fragment() {
 
         btnIconSettings.setOnClickListener { onIconAction(0) }
         btnIconSource.setOnClickListener { onIconAction(1) }
-        btnIconEdit.setOnClickListener { onIconAction(2) }
-        btnIconFavorite.setOnClickListener { onIconAction(3) }
+        btnIconFavorite.setOnClickListener { onIconAction(2) }
 
         btnIconSettings.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) iconSelectedIndex = 0
@@ -110,11 +109,8 @@ class PlayerFragment : Fragment() {
         btnIconSource.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) iconSelectedIndex = 1
         }
-        btnIconEdit.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) iconSelectedIndex = 2
-        }
         btnIconFavorite.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) iconSelectedIndex = 3
+            if (hasFocus) iconSelectedIndex = 2
         }
 
         btnRetry.setOnClickListener {
@@ -444,6 +440,7 @@ class PlayerFragment : Fragment() {
             (activity as? MainActivity)?.showSourceMgmt()
             return
         }
+        viewModel.cancelCategorySelect()
         isIconFocus = true
         iconSelectedIndex = 0
         iconPanel.visibility = View.VISIBLE
@@ -460,12 +457,12 @@ class PlayerFragment : Fragment() {
     private fun handleIconKey(keyCode: Int): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
-                iconSelectedIndex = (iconSelectedIndex - 1 + 4) % 4
+                iconSelectedIndex = (iconSelectedIndex - 1 + 3) % 3
                 focusIconItem(iconSelectedIndex)
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                iconSelectedIndex = (iconSelectedIndex + 1) % 4
+                iconSelectedIndex = (iconSelectedIndex + 1) % 3
                 focusIconItem(iconSelectedIndex)
                 true
             }
@@ -473,7 +470,12 @@ class PlayerFragment : Fragment() {
                 onIconAction(iconSelectedIndex)
                 true
             }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                exitIconSelect()
+                viewModel.enterCategorySelect()
+                true
+            }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 exitIconSelect()
                 true
             }
@@ -488,26 +490,23 @@ class PlayerFragment : Fragment() {
         when (index) {
             0 -> btnIconSettings.requestFocus()
             1 -> btnIconSource.requestFocus()
-            2 -> btnIconEdit.requestFocus()
-            3 -> btnIconFavorite.requestFocus()
+            2 -> btnIconFavorite.requestFocus()
         }
     }
 
     private fun onIconAction(index: Int) {
         when (index) {
             0 -> {
+                viewModel.navigateTo(Screen.SETTINGS)
                 (activity as? MainActivity)?.showSettings()
                 isIconFocus = false
             }
             1 -> {
+                viewModel.navigateTo(Screen.SOURCE_MGMT)
                 (activity as? MainActivity)?.showSourceMgmt()
                 isIconFocus = false
             }
             2 -> {
-                (activity as? MainActivity)?.showChannelEdit()
-                isIconFocus = false
-            }
-            3 -> {
                 val state = viewModel.state.value
                 val before = state.isFavorite
                 viewModel.toggleFavorite()
@@ -569,10 +568,52 @@ class PlayerFragment : Fragment() {
                 true
             }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
+                showCategoryChannelMenu()
                 true
             }
             else -> false
         }
+    }
+
+    private fun showCategoryChannelMenu() {
+        val state = viewModel.state.value
+        val idx = state.selectedChannelIndex
+        val chs = state.categoryChannels
+        if (idx < 0 || idx >= chs.size) return
+        val channel = chs[idx]
+        val curCat = state.allCategories.getOrNull(state.selectedCategoryIndex) ?: return
+
+        val items = mutableListOf("删除")
+        val availableCats = state.allCategories.filter {
+            it != ChannelRepository.FAVORITE_CATEGORY && it != curCat
+        }
+        if (availableCats.isNotEmpty()) {
+            items.add("移动到其他分类")
+        }
+
+        AlertDialog.Builder(requireActivity())
+            .setTitle(channel.name)
+            .setItems(items.toTypedArray()) { _, which ->
+                when (which) {
+                    0 -> viewModel.deleteCategoryChannel(idx)
+                    1 -> if (availableCats.isNotEmpty()) showMoveCategoryDialog(channel, idx, availableCats)
+                }
+            }
+            .setNegativeButton("返回", null)
+            .show()
+    }
+
+    private fun showMoveCategoryDialog(channel: Channel, channelIndex: Int, categories: List<String>) {
+        AlertDialog.Builder(requireActivity())
+            .setTitle("移动到")
+            .setItems(categories.toTypedArray()) { _, which ->
+                if (which < categories.size) {
+                    viewModel.moveCategoryChannel(channelIndex, categories[which])
+                    Toast.makeText(requireContext(), "已移动到 ${categories[which]}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showOsdTemp() {

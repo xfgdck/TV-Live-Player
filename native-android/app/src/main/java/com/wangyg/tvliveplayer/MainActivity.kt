@@ -56,14 +56,6 @@ class MainActivity : FragmentActivity() {
             .commit()
     }
 
-    fun showChannelEdit() {
-        val fragment = com.wangyg.tvliveplayer.ui.channel.ChannelEditFragment()
-        supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, fragment, "channel_edit")
-            .addToBackStack("channel_edit")
-            .commit()
-    }
-
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
