@@ -8,6 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.activity.viewModels
 import com.wangyg.tvliveplayer.data.preferences.AppPreferences
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
+import com.wangyg.tvliveplayer.ui.player.Page
 import com.wangyg.tvliveplayer.ui.player.PlayerFragment
 import com.wangyg.tvliveplayer.ui.player.PlayerViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -60,22 +61,32 @@ class MainActivity : FragmentActivity() {
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-            val state = playerViewModel.state.value
-            if (state.channels.isEmpty() && state.channelsLoaded) {
-                Toast.makeText(this, "请先添加直播源", Toast.LENGTH_SHORT).show()
-                return true
-            }
-            if (currentFragment is PlayerFragment) {
-                return currentFragment.handleKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
-            }
-            if (supportFragmentManager.backStackEntryCount > 0) {
-                if (supportFragmentManager.backStackEntryCount == 1) {
-                    playerViewModel.resetToPlayer()
+            val navStack = playerViewModel.state.value.navStack
+
+            if (navStack.size <= 1) {
+                // Level 0 — delegate to PlayerFragment for exit confirm, or handle FragmentManager
+                if (currentFragment is PlayerFragment) {
+                    return currentFragment.handleKeyDown(keyCode, event) || super.onKeyDown(keyCode, event)
                 }
-                supportFragmentManager.popBackStack()
+                if (supportFragmentManager.backStackEntryCount > 0) {
+                    supportFragmentManager.popBackStack()
+                    return true
+                }
+                finish()
                 return true
             }
-            finish()
+
+            // Level 1+: pop navStack one level at a time
+            val last = navStack.last()
+            playerViewModel.popPage()
+            when (last) {
+                Page.SETTINGS, Page.SOURCE_MGMT, Page.UPDATE -> {
+                    supportFragmentManager.popBackStack()
+                }
+                else -> {
+                    // ICON, CATEGORY — PlayerFragment observes navStack and hides overlay
+                }
+            }
             return true
         }
 

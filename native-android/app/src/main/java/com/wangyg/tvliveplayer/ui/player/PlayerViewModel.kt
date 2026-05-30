@@ -14,15 +14,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class Screen {
+enum class Page {
     PLAYER,
-    CATEGORY_SELECT,
-    ICON_SELECT,
-    MENU,
+    CATEGORY,
+    ICON,
     SETTINGS,
     SOURCE_MGMT,
-    CHANNEL_EDIT,
-    ADD_SOURCE,
     UPDATE
 }
 
@@ -32,7 +29,7 @@ data class PlayerUiState(
     val currentChannel: Channel? = null,
     val currentIndex: Int = 0,
     val isFavorite: Boolean = false,
-    val screenStack: List<Screen> = listOf(Screen.PLAYER),
+    val navStack: List<Page> = listOf(Page.PLAYER),
     val categoryChannels: List<Channel> = emptyList(),
     val selectedCategoryIndex: Int = 0,
     val selectedChannelIndex: Int = 0,
@@ -217,13 +214,13 @@ class PlayerViewModel @Inject constructor(
         if (chs.isNotEmpty() && idx < chs.size) {
             playChannel(chs[idx])
         }
-        _state.update { it.copy(screenStack = listOf(Screen.PLAYER)) }
+        _state.update { it.copy(navStack = ensureSingleLevel1Path(listOf(Page.PLAYER))) }
     }
 
     fun resetToPlayer() {
         _state.update {
             it.copy(
-                screenStack = listOf(Screen.PLAYER),
+                navStack = ensureSingleLevel1Path(listOf(Page.PLAYER)),
                 videoPaused = false,
                 enteredByOk = false
             )
@@ -231,7 +228,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun cancelCategorySelect() {
-        _state.update { it.copy(screenStack = listOf(Screen.PLAYER)) }
+        _state.update { it.copy(navStack = ensureSingleLevel1Path(listOf(Page.PLAYER))) }
     }
 
     fun enterCategorySelect() {
@@ -242,8 +239,14 @@ class PlayerViewModel @Inject constructor(
             val channels = repository.getChannelsByCategory(curCat).first()
             val chIdx = channels.indexOfFirst { it.id == s.currentChannel?.id }.coerceAtLeast(0)
             _state.update {
+                val cur = it.navStack
+                val newStack = if (cur.size >= 2 && cur[1] in listOf(Page.ICON, Page.CATEGORY)) {
+                    cur.toMutableList().apply { this[1] = Page.CATEGORY }
+                } else {
+                    listOf(Page.PLAYER, Page.CATEGORY)
+                }
                 it.copy(
-                    screenStack = listOf(Screen.CATEGORY_SELECT),
+                    navStack = ensureSingleLevel1Path(newStack),
                     selectedCategoryIndex = catIdx,
                     categoryChannels = channels,
                     selectedChannelIndex = chIdx
@@ -252,40 +255,40 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun openMenu(fromOk: Boolean) {
-        if (fromOk) {
-            _state.update { it.copy(videoPaused = true, enteredByOk = true) }
-        }
-        _state.update { it.copy(screenStack = _state.value.screenStack + Screen.MENU) }
+    /** Ensure Level 1 pages (ICON/CATEGORY) are mutually exclusive — only one at position 1 */
+    private fun ensureSingleLevel1Path(stack: List<Page>): List<Page> {
+        val l1Indices = stack.mapIndexedNotNull { i, p -> if (p == Page.ICON || p == Page.CATEGORY) i else null }
+        if (l1Indices.size <= 1) return stack
+        // Keep the last Level 1 entry, remove the rest
+        val keep = l1Indices.last()
+        return stack.filterIndexed { i, _ -> i == keep || (i !in l1Indices) }
     }
 
-    fun closeMenu() {
+    fun pushPage(page: Page) {
+        _state.update { s ->
+            val stack = s.navStack.toMutableList()
+            if (page == Page.ICON || page == Page.CATEGORY) {
+                if (stack.size >= 2 && stack[1] in listOf(Page.ICON, Page.CATEGORY)) {
+                    stack[1] = page
+                } else if (stack.size == 1) {
+                    stack.add(page)
+                }
+            } else {
+                stack.add(page)
+            }
+            s.copy(navStack = ensureSingleLevel1Path(stack))
+        }
+    }
+
+    fun popPage(): Boolean {
         val s = _state.value
-        _state.update {
-            it.copy(
-                screenStack = listOf(Screen.PLAYER),
-                videoPaused = false,
-                enteredByOk = false
-            )
-        }
-    }
-
-    fun navigateTo(screen: Screen) {
-        val stack = _state.value.screenStack
-        _state.update { it.copy(screenStack = stack + screen) }
-    }
-
-    fun navigateBack(): Boolean {
-        val stack = _state.value.screenStack.toMutableList()
-        if (stack.size <= 1) {
-            if (stack.last() == Screen.PLAYER) {
+        if (s.navStack.size <= 1) {
+            if (s.navStack.last() == Page.PLAYER) {
                 _state.update { it.copy(showExitConfirm = true) }
-                return false
             }
             return false
         }
-        stack.removeLast()
-        _state.update { it.copy(screenStack = stack) }
+        _state.update { it.copy(navStack = ensureSingleLevel1Path(it.navStack.dropLast(1))) }
         return true
     }
 
@@ -294,7 +297,9 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun toggleFavorite() {
-        val channel = _state.value.currentChannel ?: return
+        val channel = _state.value.currentChannel ?: run {
+            return
+        }
         viewModelScope.launch {
             val isFav = repository.toggleFavorite(channel.id)
             _state.update { it.copy(isFavorite = isFav) }

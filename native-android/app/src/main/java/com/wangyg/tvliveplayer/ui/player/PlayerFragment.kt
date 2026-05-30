@@ -8,7 +8,7 @@ import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
-import android.view.SurfaceView
+import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -41,7 +41,7 @@ class PlayerFragment : Fragment() {
     @Inject lateinit var tvPlayer: TVPlayer
     private val viewModel: PlayerViewModel by viewModels(ownerProducer = { requireActivity() })
 
-    private lateinit var surfaceView: SurfaceView
+    private lateinit var surfaceView: TextureView
     private lateinit var osdLayout: View
     private lateinit var tvChannelName: TextView
     private lateinit var progressBar: ProgressBar
@@ -64,7 +64,6 @@ class PlayerFragment : Fragment() {
     private val exitHandler = Handler(Looper.getMainLooper())
     private val OSD_TIMEOUT_MS = 3000L
     private var exitConfirmRunnable: Runnable? = null
-    private var isIconFocus = false
     private var lastPlayedUrl: String? = null
     private var redirectingToSourceMgmt = false
 
@@ -130,12 +129,14 @@ class PlayerFragment : Fragment() {
                     updateChannelInfo(state)
                     updateIconFavorite(state)
                     updateCategoryOverlay(state)
+                    updateIconPanel(state)
                     updateExitConfirm(state)
                     updateEmptyState(state)
                     val url = state.currentChannel?.url
                     if (url != null && url != lastPlayedUrl) {
                         lastPlayedUrl = url
                         tvError.visibility = View.GONE
+                        ivPause.visibility = View.GONE
                         tvPlayer.play(url)
                     } else if (state.currentChannel == null && lastPlayedUrl != null) {
                         lastPlayedUrl = null
@@ -166,7 +167,9 @@ class PlayerFragment : Fragment() {
                     }
                     PlaybackState.READY -> {
                         progressBar.visibility = View.GONE
-                        ivPause.visibility = View.GONE
+                        if (tvPlayer.isPlaying()) {
+                            ivPause.visibility = View.GONE
+                        }
                         tvError.visibility = View.GONE
                         tvWelcome.visibility = View.GONE
                         tvEmptyGuide.visibility = View.GONE
@@ -244,7 +247,7 @@ class PlayerFragment : Fragment() {
     }
 
     private fun updateCategoryOverlay(state: PlayerUiState) {
-        val isCategorySelect = state.screenStack.lastOrNull() == Screen.CATEGORY_SELECT
+        val isCategorySelect = state.navStack.lastOrNull() == Page.CATEGORY
         categoryOverlay.visibility = if (isCategorySelect) View.VISIBLE else View.GONE
 
         if (isCategorySelect) {
@@ -313,6 +316,18 @@ class PlayerFragment : Fragment() {
         }
     }
 
+    private fun updateIconPanel(state: PlayerUiState) {
+        val shouldShow = state.navStack.lastOrNull() == Page.ICON
+        if (shouldShow && iconPanel.visibility != View.VISIBLE) {
+            iconPanel.visibility = View.VISIBLE
+            iconPanel.alpha = 1.0f
+            btnIconSettings.requestFocus()
+        } else if (!shouldShow && iconPanel.visibility == View.VISIBLE) {
+            iconPanel.visibility = View.GONE
+            view?.requestFocus()
+        }
+    }
+
     private fun updateExitConfirm(state: PlayerUiState) {
         if (state.showExitConfirm) {
             tvExitConfirm.visibility = View.VISIBLE
@@ -331,7 +346,7 @@ class PlayerFragment : Fragment() {
     private fun setupTouch() {
         val gestureDetector = GestureDetector(requireContext(), object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                if (!isIconFocus && viewModel.state.value.screenStack.lastOrNull() == Screen.PLAYER) {
+                if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
                     enterIconSelect()
                 }
                 return true
@@ -352,7 +367,7 @@ class PlayerFragment : Fragment() {
                 return true
             }
             override fun onLongPress(e: MotionEvent) {
-                if (!isIconFocus && viewModel.state.value.screenStack.lastOrNull() == Screen.PLAYER) {
+                if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
                     if (viewModel.state.value.channels.isNotEmpty()) {
                         enterIconSelect()
                     }
@@ -367,13 +382,10 @@ class PlayerFragment : Fragment() {
 
     fun handleKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val state = viewModel.state.value
-        val currentScreen = state.screenStack.lastOrNull() ?: Screen.PLAYER
-
-        if (isIconFocus) return handleIconKey(keyCode)
-
-        return when (currentScreen) {
-            Screen.CATEGORY_SELECT -> handleCategoryKey(keyCode)
-            Screen.PLAYER -> handlePlayerKey(keyCode)
+        return when (state.navStack.lastOrNull()) {
+            Page.ICON -> handleIconKey(keyCode)
+            Page.CATEGORY -> handleCategoryKey(keyCode)
+            Page.PLAYER -> handlePlayerKey(keyCode)
             else -> false
         }
     }
@@ -424,11 +436,7 @@ class PlayerFragment : Fragment() {
                 true
             }
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                if (viewModel.state.value.showExitConfirm) {
-                    requireActivity().finish()
-                } else {
-                    viewModel.navigateBack()
-                }
+                viewModel.popPage()
                 true
             }
             else -> false
@@ -440,8 +448,7 @@ class PlayerFragment : Fragment() {
             (activity as? MainActivity)?.showSourceMgmt()
             return
         }
-        viewModel.cancelCategorySelect()
-        isIconFocus = true
+        viewModel.pushPage(Page.ICON)
         iconSelectedIndex = 0
         iconPanel.visibility = View.VISIBLE
         iconPanel.alpha = 1.0f
@@ -449,7 +456,7 @@ class PlayerFragment : Fragment() {
     }
 
     private fun exitIconSelect() {
-        isIconFocus = false
+        viewModel.popPage()
         iconPanel.visibility = View.GONE
         view?.requestFocus()
     }
@@ -472,14 +479,10 @@ class PlayerFragment : Fragment() {
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 exitIconSelect()
-                viewModel.enterCategorySelect()
-                true
-            }
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                exitIconSelect()
                 true
             }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
+                exitIconSelect()
                 true
             }
             else -> false
@@ -497,14 +500,12 @@ class PlayerFragment : Fragment() {
     private fun onIconAction(index: Int) {
         when (index) {
             0 -> {
-                viewModel.navigateTo(Screen.SETTINGS)
+                viewModel.pushPage(Page.SETTINGS)
                 (activity as? MainActivity)?.showSettings()
-                isIconFocus = false
             }
             1 -> {
-                viewModel.navigateTo(Screen.SOURCE_MGMT)
+                viewModel.pushPage(Page.SOURCE_MGMT)
                 (activity as? MainActivity)?.showSourceMgmt()
-                isIconFocus = false
             }
             2 -> {
                 val state = viewModel.state.value
@@ -561,10 +562,6 @@ class PlayerFragment : Fragment() {
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 viewModel.confirmCategorySelect()
-                true
-            }
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                viewModel.cancelCategorySelect()
                 true
             }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {

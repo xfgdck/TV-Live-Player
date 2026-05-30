@@ -11,8 +11,8 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.viewModels
 import com.wangyg.tvliveplayer.MainActivity
 import com.wangyg.tvliveplayer.R
+import com.wangyg.tvliveplayer.ui.player.Page
 import com.wangyg.tvliveplayer.ui.player.PlayerViewModel
-import com.wangyg.tvliveplayer.ui.player.Screen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -38,12 +38,12 @@ class MainMenuDialogFragment : DialogFragment() {
         updateFavoriteIcon(btnFavorite)
 
         btnSettings.setOnClickListener {
-            viewModel.navigateTo(Screen.SETTINGS)
+            viewModel.pushPage(Page.SETTINGS)
             (activity as? MainActivity)?.showSettings()
             dialog.dismiss()
         }
         btnSourceMgmt.setOnClickListener {
-            viewModel.navigateTo(Screen.SOURCE_MGMT)
+            viewModel.pushPage(Page.SOURCE_MGMT)
             (activity as? MainActivity)?.showSourceMgmt()
             dialog.dismiss()
         }
@@ -117,12 +117,12 @@ class MainMenuDialogFragment : DialogFragment() {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 when (selectedIndex) {
                     0 -> {
-                        viewModel.navigateTo(Screen.SETTINGS)
+                        viewModel.pushPage(Page.SETTINGS)
                         (activity as? MainActivity)?.showSettings()
                         dismiss()
                     }
                     1 -> {
-                        viewModel.navigateTo(Screen.SOURCE_MGMT)
+                        viewModel.pushPage(Page.SOURCE_MGMT)
                         (activity as? MainActivity)?.showSourceMgmt()
                         dismiss()
                     }
@@ -145,7 +145,7 @@ class MainMenuDialogFragment : DialogFragment() {
                 true
             }
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
-                viewModel.closeMenu()
+                viewModel.resetToPlayer()
                 dismiss()
                 true
             }

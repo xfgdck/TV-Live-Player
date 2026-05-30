@@ -1,7 +1,7 @@
 package com.wangyg.tvliveplayer.player
 
 import android.content.Context
-import android.view.SurfaceView
+import android.view.TextureView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -37,9 +37,9 @@ class TVPlayer @Inject constructor(private val context: Context) {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    fun initialize(surfaceView: SurfaceView) {
+    fun initialize(textureView: TextureView) {
         if (exoPlayer != null) {
-            exoPlayer?.setVideoSurfaceView(surfaceView)
+            exoPlayer?.setVideoTextureView(textureView)
             return
         }
         val okHttpClient = OkHttpClient.Builder()
@@ -55,7 +55,7 @@ class TVPlayer @Inject constructor(private val context: Context) {
         dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
         exoPlayer = ExoPlayer.Builder(context).build()
             .also { player ->
-                player.setVideoSurfaceView(surfaceView)
+                player.setVideoTextureView(textureView)
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         _playbackState.value = when (state) {
