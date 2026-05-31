@@ -16,7 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="扫码输入"
+            android:text="扫码添加"
             android:textColor="@color/accent"
             android:textSize="22sp"
             android:textStyle="bold" />
@@ -44,7 +44,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:gravity="center"
-            android:text="请使用手机扫描二维码，在手机页面上输入链接"
+            android:text="请使用手机扫描二维码，在手机页面上进行配置"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
