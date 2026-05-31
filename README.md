@@ -189,3 +189,10 @@ Android TV 直播播放器
 | SDK | C:\Android\sdk (platform android-36, build-tools 35.0.0) |
 | Gradle | 8.9 / AGP 8.7.3 / Kotlin 2.1.0 |
 | 模拟器 | MuMu (ADB 127.0.0.1:7555) |
+
+### 包名
+
+| 项目 | 值 |
+|------|-----|
+| namespace / applicationId | `top.xiaofeigun.tvliveplayer` |
+| 应用签名 | release.jks（GitHub Secrets 管理） |
