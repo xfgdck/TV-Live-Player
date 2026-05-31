@@ -72,7 +72,7 @@ jobs:
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass android -keypass android -dname "CN=Debug, OU=Dev, O=TVLivePlayer, L=Unknown, ST=Unknown, C=CN"
             ./gradlew assembleRelease --no-daemon \
-              -Pandroid.injected.signing.store.file=debug.keystore \
+              -Pandroid.injected.signing.store.file=app/debug.keystore \
               -Pandroid.injected.signing.store.password=android \
               -Pandroid.injected.signing.key.alias=androiddebugkey \
               -Pandroid.injected.signing.key.password=android
