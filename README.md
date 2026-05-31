@@ -136,8 +136,13 @@ Android TV 直播播放器
 
 ### 频道操作菜单
 
-- **删除**：从数据库移除该频道
-- **移动到其他分类**：将频道移动到选中的目标分类（排除「我的收藏」和当前分类）
+**我的收藏分类：**
+- **取消收藏**
+
+**其他分类：**
+- **移动到其它分类**：将频道移动到选中的目标分类
+- **删除当前频道**：从数据库移除该频道
+- **清空当前分类**：二次确认后删除该分类下所有频道
 
 ## 六、Level 2 – 设置界面 (SETTINGS)
 
@@ -196,3 +201,82 @@ Android TV 直播播放器
 |------|-----|
 | namespace / applicationId | `top.xiaofeigun.tvliveplayer` |
 | 应用签名 | release.jks（GitHub Secrets 管理） |
+
+## 十、项目架构
+
+### 整体架构
+
+采用 **Clean Architecture lite** 三层架构：
+
+```
+UI Layer (Fragments + ViewModel)
+    ↕ StateFlow 观察
+Domain Layer (Model + Repository 接口)
+    ↕ 接口实现
+Data Layer (Room + Preferences)
+```
+
+### 包结构
+
+```
+top.xiaofeigun.tvliveplayer/
+├── App.kt                    # @HiltAndroidApp 入口
+├── MainActivity.kt           # 单 Activity 宿主
+├── di/AppModule.kt           # Hilt DI 模块
+├── domain/
+│   ├── model/                # Channel, Source 纯 Kotlin 数据类
+│   ├── repository/           # ChannelRepository 接口
+│   └── usecase/              # ParseAndImportM3UUseCase
+├── data/
+│   ├── local/                # Room 数据库 + Entity + DAO
+│   ├── preferences/          # SharedPreferences 封装
+│   └── repository/           # ChannelRepositoryImpl 实现
+├── parser/M3UParser.kt       # M3U / TXT 双格式解析器
+├── player/TVPlayer.kt        # ExoPlayer 封装（URL 自动换源）
+├── util/
+│   ├── QrCodeHelper.kt       # ZXing 二维码生成
+│   └── QrCodeServer.kt       # 嵌入式 HTTP 服务器
+└── ui/
+    ├── player/               # PlayerFragment + PlayerViewModel
+    ├── channel/              # ChannelEditFragment
+    ├── settings/             # 设置、源管理、QR 扫码等
+    └── menu/                 # MainMenuDialogFragment
+```
+
+### 数据流
+
+```
+M3U URL → OkHttp → M3UParser → ChannelRepository → Room DB
+                                                      ↓ (Flow 观察)
+                                              PlayerViewModel (StateFlow)
+                                                      ↓
+                                              PlayerFragment 渲染 UI
+```
+
+- Room DAO 返回 `Flow<List<T>>`，数据变更自动推送
+- ViewModel 通过 `StateFlow<PlayerUiState>` 驱动 UI
+- TVPlayer 独立维护 `playbackState` StateFlow，Fragment 直接收集
+
+### 导航系统
+
+双重导航：
+
+| 机制 | 用途 |
+|------|------|
+| `navStack` (Page 枚举列表) | 覆盖层页面：PLAYER / ICON / CATEGORY / SETTINGS / SOURCE_MGMT / UPDATE |
+| FragmentManager | 全屏 Fragment 切换：Settings / SourceMgmt / Update |
+
+- `ensureSingleLevel1Path()` 保证 ICON 和 CATEGORY 互斥
+- BACK 键按 navStack 逐层返回，Level 0 显示退出确认
+
+### 关键设计模式
+
+| 模式 | 应用 |
+|------|------|
+| MVVM | StateFlow + Fragment 观察 |
+| Repository | 接口/实现分离 |
+| Singleton (Hilt) | TVPlayer、M3UParser、AppPreferences |
+| 观察者 (Flow) | Room → ViewModel → UI |
+| 职责链 | Activity 按 navStack 分发按键事件 |
+| URL 换源 | Player 失败自动切换到 backupUrls |
+| 嵌入 HTTP 服务 | QrCodeServer 单线程 ServerSocket |
