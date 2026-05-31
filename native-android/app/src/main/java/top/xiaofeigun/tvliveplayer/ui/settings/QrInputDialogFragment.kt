@@ -50,6 +50,7 @@ class QrInputDialogFragment : DialogFragment() {
                 tvInfo.text = "无法获取设备IP地址，请确保已连接网络"
                 return@launch
             }
+			tvInfo.text = "地址: ${srv.localUrl}"
             ivQr.setImageBitmap(QrCodeHelper.generate(srv.localUrl, 512))
 
             val result = srv.waitForUrl()
