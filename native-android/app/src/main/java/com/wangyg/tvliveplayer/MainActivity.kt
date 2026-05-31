@@ -2,6 +2,7 @@ package com.wangyg.tvliveplayer
 
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -26,6 +27,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         if (appPreferences.isFirstLaunch()) {
             lifecycleScope.launch {
