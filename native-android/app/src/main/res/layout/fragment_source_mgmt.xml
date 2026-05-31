@@ -16,28 +16,19 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:padding="8dp"
-            android:text="直播源"
+            android:text="直播源管理"
             android:textColor="@color/accent"
             android:textSize="22sp"
             android:textStyle="bold" />
 
         <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="扫码添加，支持 M3U 链接 / 单个频道 / 文件上传"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:paddingBottom="8dp" />
-
-        <TextView
             android:id="@+id/btn_qr_scan"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/menu_item_bg"
             android:gravity="center"
-            android:text="扫码添加"
+            android:text="扫码添加（需连同一WiFi）"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:focusable="true"
@@ -50,7 +41,7 @@
             android:layout_marginTop="8dp"
             android:background="@drawable/menu_item_bg"
             android:gravity="center"
-            android:text="链接导入"
+            android:text="从 URL 导入"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:focusable="true"

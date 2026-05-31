@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.wangyg.tvliveplayer"
+    namespace = "top.xiaofeigun.tvliveplayer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.wangyg.tvliveplayer"
+        applicationId = "top.xiaofeigun.tvliveplayer"
         minSdk = 23
         targetSdk = 36
         versionCode = 1
