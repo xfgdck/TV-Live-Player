@@ -336,6 +336,25 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    fun deleteCategory(category: String) {
+        viewModelScope.launch {
+            val channels = repository.getChannelsByCategory(category).first()
+            channels.forEach { repository.deleteChannel(it) }
+            val updatedCats = repository.getAllCategoriesWithFavorite().first()
+            val newCatIndex = (updatedCats.indexOf(category).coerceAtLeast(0))
+                .let { if (it >= updatedCats.size) updatedCats.size - 1 else it }
+                .coerceAtLeast(0)
+            _state.update {
+                it.copy(
+                    allCategories = updatedCats,
+                    selectedCategoryIndex = newCatIndex,
+                    categoryChannels = emptyList()
+                )
+            }
+            refreshAll()
+        }
+    }
+
     fun refreshCategoryChannels(category: String) {
         viewModelScope.launch {
             val channels = repository.getChannelsByCategory(category).first()

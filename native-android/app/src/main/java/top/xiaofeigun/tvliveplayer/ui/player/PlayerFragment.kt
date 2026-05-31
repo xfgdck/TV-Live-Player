@@ -622,20 +622,34 @@ class PlayerFragment : Fragment() {
         val channel = chs[idx]
         val curCat = state.allCategories.getOrNull(state.selectedCategoryIndex) ?: return
 
-        val items = mutableListOf("删除")
+        if (curCat == ChannelRepository.FAVORITE_CATEGORY) {
+            AlertDialog.Builder(requireActivity())
+                .setTitle(channel.name)
+                .setItems(arrayOf("取消收藏")) { _, _ ->
+                    viewModel.toggleFavorite()
+                    Toast.makeText(requireContext(), "已取消收藏", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("返回", null)
+                .show()
+            return
+        }
+
+        val items = mutableListOf("移动到其它分类", "删除当前频道", "清空当前分类")
         val availableCats = state.allCategories.filter {
             it != ChannelRepository.FAVORITE_CATEGORY && it != curCat
-        }
-        if (availableCats.isNotEmpty()) {
-            items.add("移动到其他分类")
         }
 
         AlertDialog.Builder(requireActivity())
             .setTitle(channel.name)
             .setItems(items.toTypedArray()) { _, which ->
                 when (which) {
-                    0 -> viewModel.deleteCategoryChannel(idx)
-                    1 -> if (availableCats.isNotEmpty()) showMoveCategoryDialog(channel, idx, availableCats)
+                    0 -> if (availableCats.isNotEmpty()) {
+                        showMoveCategoryDialog(channel, idx, availableCats)
+                    } else {
+                        Toast.makeText(requireContext(), "无其他分类可移动", Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> viewModel.deleteCategoryChannel(idx)
+                    2 -> showDeleteCategoryConfirm(curCat)
                 }
             }
             .setNegativeButton("返回", null)
@@ -650,6 +664,18 @@ class PlayerFragment : Fragment() {
                     viewModel.moveCategoryChannel(channelIndex, categories[which])
                     Toast.makeText(requireContext(), "已移动到 ${categories[which]}", Toast.LENGTH_SHORT).show()
                 }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showDeleteCategoryConfirm(category: String) {
+        AlertDialog.Builder(requireActivity())
+            .setTitle("清空分类")
+            .setMessage("确定要清空分类「$category」吗？该分类下的所有频道将被永久删除。")
+            .setPositiveButton("确定清空") { _, _ ->
+                viewModel.deleteCategory(category)
+                Toast.makeText(requireContext(), "分类「$category」已清空", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("取消", null)
             .show()

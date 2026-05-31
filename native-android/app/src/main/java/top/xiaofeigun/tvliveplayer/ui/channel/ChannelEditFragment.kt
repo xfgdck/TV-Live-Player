@@ -237,8 +237,9 @@ class ChannelEditFragment : Fragment() {
         if (currentCategory == ChannelRepository.FAVORITE_CATEGORY) {
             items.add("取消收藏")
         } else {
-            items.add("删除")
-            items.add("移动到其他分类")
+            items.add("删除当前频道")
+            items.add("移动到其它分类")
+            items.add("清空当前分类")
         }
 
         AlertDialog.Builder(requireActivity())
@@ -262,6 +263,7 @@ class ChannelEditFragment : Fragment() {
                             }
                         }
                         1 -> showMoveCategoryDialog(channel)
+                        2 -> showDeleteCategoryConfirm(currentCategory)
                     }
                 }
             }
@@ -286,6 +288,24 @@ class ChannelEditFragment : Fragment() {
                         Toast.makeText(requireContext(), "已移动到 ${availableCats[which]}", Toast.LENGTH_SHORT).show()
                         selectCategory(selectedCategory)
                     }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showDeleteCategoryConfirm(category: String) {
+        AlertDialog.Builder(requireActivity())
+            .setTitle("清空分类")
+            .setMessage("确定要清空分类「$category」吗？该分类下的所有频道将被永久删除。")
+            .setPositiveButton("确定清空") { _, _ ->
+                lifecycleScope.launch {
+                    val catChannels = channelRepository.getChannelsByCategory(category).first()
+                    catChannels.forEach { ch ->
+                        channelRepository.deleteChannel(ch)
+                    }
+                    Toast.makeText(requireContext(), "分类「$category」已清空", Toast.LENGTH_SHORT).show()
+                    loadData()
                 }
             }
             .setNegativeButton("取消", null)
