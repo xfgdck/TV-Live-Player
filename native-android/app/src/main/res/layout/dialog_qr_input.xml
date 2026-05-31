@@ -1,13 +1,14 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="#CC000000">
 
     <LinearLayout
-        android:layout_width="500dp"
+        android:layout_width="400dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:background="@color/surface"
+        android:gravity="center"
         android:orientation="vertical"
         android:padding="24dp">
 
@@ -15,56 +16,47 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:padding="8dp"
-            android:text="直播源"
+            android:text="扫码输入"
             android:textColor="@color/accent"
             android:textSize="22sp"
             android:textStyle="bold" />
 
+        <ImageView
+            android:id="@+id/iv_qr_code"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:layout_marginTop="16dp"
+            android:background="@color/white"
+            android:padding="8dp"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/tv_qr_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:gravity="center"
-            android:text="扫码添加，支持 M3U 链接 / 单个频道 / 文件上传"
+            android:text="请使用手机扫描二维码，在手机页面上输入链接"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:paddingBottom="8dp" />
+            android:textSize="13sp" />
 
         <TextView
-            android:id="@+id/btn_qr_scan"
+            android:id="@+id/btn_qr_cancel"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/menu_item_bg"
             android:gravity="center"
-            android:text="扫码添加"
+            android:text="取消"
             android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:focusable="true"
-            android:clickable="true" />
-
-        <TextView
-            android:id="@+id/btn_url"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center"
-            android:text="链接导入"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:focusable="true"
-            android:clickable="true" />
-
-        <TextView
-            android:id="@+id/btn_clear"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center"
-            android:text="清空节目单"
-            android:textColor="@color/error_color"
             android:textSize="16sp"
             android:focusable="true"
             android:clickable="true" />

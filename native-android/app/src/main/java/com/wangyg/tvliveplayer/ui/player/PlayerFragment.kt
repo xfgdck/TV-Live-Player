@@ -113,7 +113,7 @@ class PlayerFragment : Fragment() {
         }
 
         btnRetry.setOnClickListener {
-            viewModel.state.value.currentChannel?.let { tvPlayer.play(it.url) }
+            viewModel.state.value.currentChannel?.let { tvPlayer.playUrls(it.allUrls) }
         }
 
         observeState()
@@ -132,13 +132,16 @@ class PlayerFragment : Fragment() {
                     updateIconPanel(state)
                     updateExitConfirm(state)
                     updateEmptyState(state)
-                    val url = state.currentChannel?.url
-                    if (url != null && url != lastPlayedUrl) {
-                        lastPlayedUrl = url
-                        tvError.visibility = View.GONE
-                        ivPause.visibility = View.GONE
-                        tvPlayer.play(url)
-                    } else if (state.currentChannel == null && lastPlayedUrl != null) {
+                    val channel = state.currentChannel
+                    if (channel != null) {
+                        val playUrl = channel.url
+                        if (playUrl != lastPlayedUrl) {
+                            lastPlayedUrl = playUrl
+                            tvError.visibility = View.GONE
+                            ivPause.visibility = View.GONE
+                            tvPlayer.playUrls(channel.allUrls)
+                        }
+                    } else if (lastPlayedUrl != null) {
                         lastPlayedUrl = null
                         ivPause.visibility = View.GONE
                         tvPlayer.release()
@@ -205,6 +208,7 @@ class PlayerFragment : Fragment() {
                 }
             }
         }
+
     }
 
     private fun updatePlayer(state: PlayerUiState) {

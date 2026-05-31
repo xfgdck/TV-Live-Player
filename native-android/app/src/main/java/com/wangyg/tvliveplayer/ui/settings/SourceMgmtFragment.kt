@@ -1,7 +1,6 @@
 package com.wangyg.tvliveplayer.ui.settings
 
 import android.app.AlertDialog
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +9,6 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.wangyg.tvliveplayer.MainActivity
@@ -19,6 +17,7 @@ import com.wangyg.tvliveplayer.domain.model.Channel
 import com.wangyg.tvliveplayer.domain.repository.ChannelRepository
 import com.wangyg.tvliveplayer.domain.usecase.ParseAndImportM3UUseCase
 import com.wangyg.tvliveplayer.parser.M3UParser
+import com.wangyg.tvliveplayer.util.QrScanResult
 import dagger.hilt.android.AndroidEntryPoint
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -36,10 +35,6 @@ class SourceMgmtFragment : Fragment() {
     @Inject lateinit var channelRepository: ChannelRepository
     @Inject lateinit var m3uParser: M3UParser
 
-    private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) readAndParseFile(uri)
-    }
-
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -49,20 +44,17 @@ class SourceMgmtFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        view.findViewById<TextView>(R.id.btn_qr_scan).setOnClickListener { showQrScanDialog() }
         view.findViewById<TextView>(R.id.btn_url).setOnClickListener { showUrlDialog() }
-        view.findViewById<TextView>(R.id.btn_file).setOnClickListener {
-            filePicker.launch(arrayOf("text/*", "*/*"))
-        }
-        view.findViewById<TextView>(R.id.btn_manual).setOnClickListener { showManualDialog() }
         view.findViewById<TextView>(R.id.btn_clear).setOnClickListener { showClearDialog() }
 
-        view.findViewById<TextView>(R.id.btn_url).requestFocus()
+        view.findViewById<TextView>(R.id.btn_qr_scan).requestFocus()
     }
 
     private fun showUrlDialog() {
         val input = EditText(requireActivity())
         input.hint = "输入 M3U 链接地址"
-        input.setText("https://raw.githubusercontent.com/YanG-1989/m3u/main/Gather.m3u")
+        input.setText("https://ghfast.top/raw.githubusercontent.com/Supprise0901/TVBox_live/main/live.txt")
         AlertDialog.Builder(requireActivity())
             .setTitle("在线链接解析")
             .setView(input)
@@ -74,38 +66,64 @@ class SourceMgmtFragment : Fragment() {
             .show()
     }
 
-    private fun showManualDialog() {
-        val view = LayoutInflater.from(requireActivity()).inflate(R.layout.dialog_add_channel, null)
-        val etName = view.findViewById<EditText>(R.id.et_channel_name)
-        val etUrl = view.findViewById<EditText>(R.id.et_channel_url)
-        val etCategory = view.findViewById<EditText>(R.id.et_channel_category)
-        val etLogo = view.findViewById<EditText>(R.id.et_channel_logo)
+    private fun showQrScanDialog() {
+        val dialog = QrInputDialogFragment()
+        dialog.setOnResultReceived { result ->
+            when (result.type) {
+                "m3u_url" -> showUrlDialogWithUrl(result.url)
+                "channel" -> addChannelFromQr(result)
+                "file" -> parseM3uFromQr(result)
+            }
+        }
+        dialog.setOnCancel {
+            Toast.makeText(requireContext(), "已取消", Toast.LENGTH_SHORT).show()
+        }
+        dialog.show(parentFragmentManager, "qr_input")
+    }
 
+    private fun showUrlDialogWithUrl(url: String) {
+        val input = EditText(requireActivity())
+        input.hint = "输入 M3U 链接地址"
+        input.setText(url)
+        input.setSelection(url.length)
         AlertDialog.Builder(requireActivity())
-            .setTitle("手动添加频道")
-            .setView(view)
-            .setPositiveButton("添加") { _, _ ->
-                val name = etName.text.toString().trim()
-                val url = etUrl.text.toString().trim()
-                if (name.isEmpty() || url.isEmpty()) {
-                    Toast.makeText(requireContext(), "频道名称和URL不能为空", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                lifecycleScope.launch {
-                    channelRepository.addChannels(listOf(
-                        Channel(
-                            id = java.util.UUID.randomUUID().toString(),
-                            name = name,
-                            url = url,
-                            category = etCategory.text.toString().trim().ifEmpty { "自定义" },
-                            logo = etLogo.text.toString().trim().ifEmpty { null }
-                        )
-                    ))
-                    Toast.makeText(requireContext(), "添加成功", Toast.LENGTH_SHORT).show()
-                }
+            .setTitle("在线链接解析")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isNotEmpty()) downloadAndParse(text)
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun addChannelFromQr(result: QrScanResult) {
+        lifecycleScope.launch {
+            channelRepository.addChannels(listOf(
+                Channel(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = result.name,
+                    url = result.url,
+                    category = result.category.ifEmpty { "自定义" },
+                    logo = result.logo.ifEmpty { null }
+                )
+            ))
+            Toast.makeText(requireContext(), "频道「${result.name}」添加成功", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun parseM3uFromQr(result: QrScanResult) {
+        val loadingDialog = showLoadingDialog()
+        lifecycleScope.launch {
+            try {
+                val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(result.fileContent, null)
+                loadingDialog.dismiss()
+                Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showClearDialog() {
@@ -167,16 +185,4 @@ class SourceMgmtFragment : Fragment() {
             .build()
     }
 
-    private fun readAndParseFile(uri: Uri) {
-        lifecycleScope.launch {
-            try {
-                val inputStream = requireContext().contentResolver.openInputStream(uri)
-                val text = inputStream?.bufferedReader()?.use { it.readText() } ?: return@launch
-                val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(text, null)
-                Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
 }

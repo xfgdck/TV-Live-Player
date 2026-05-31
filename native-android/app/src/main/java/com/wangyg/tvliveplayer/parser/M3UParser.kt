@@ -9,18 +9,43 @@ import javax.inject.Singleton
 class M3UParser @Inject constructor() {
 
     fun parse(m3uContent: String, sourceCategory: String? = null): List<Channel> {
+        val trimmed = m3uContent.trim()
+        val rawChannels = if (trimmed.startsWith("#EXTM3U", ignoreCase = true)) {
+            parseM3u(trimmed, sourceCategory)
+        } else {
+            parseTxt(trimmed, sourceCategory)
+        }
+        return mergeByName(rawChannels)
+    }
+
+    private fun mergeByName(channels: List<Channel>): List<Channel> {
+        val groups = linkedMapOf<String, MutableList<Channel>>()
+        for (ch in channels) {
+            val key = ch.name.trim().lowercase()
+            groups.getOrPut(key) { mutableListOf() }.add(ch)
+        }
+        return groups.map { (_, list) ->
+            val first = list.first()
+            val allUrls = list.flatMap { listOf(it.url) + it.backupUrls }.distinct()
+            first.copy(
+                id = UUID.randomUUID().toString(),
+                url = allUrls.first(),
+                backupUrls = allUrls.drop(1)
+            )
+        }
+    }
+
+    private fun parseM3u(content: String, sourceCategory: String? = null): List<Channel> {
         val channels = mutableListOf<Channel>()
-        val lines = m3uContent.lines()
+        val lines = content.lines()
         var i = 0
         while (i < lines.size) {
             val line = lines[i].trim()
             if (line.startsWith("#EXTINF:")) {
-                // Parse #EXTINF:-1 tvg-id="" tvg-logo="" group-title="分类",频道名称
                 val tvgId = extractQuotedValue(line, "tvg-id")
                 val logo = extractQuotedValue(line, "tvg-logo")
                 val category = extractQuotedValue(line, "group-title") ?: sourceCategory ?: "未分类"
                 val name = line.substringAfterLast(",").trim()
-                // Next line should be the URL
                 if (i + 1 < lines.size) {
                     i++
                     val url = lines[i].trim()
@@ -38,6 +63,41 @@ class M3UParser @Inject constructor() {
                 }
             }
             i++
+        }
+        return channels
+    }
+
+    private fun parseTxt(content: String, sourceCategory: String? = null): List<Channel> {
+        val channels = mutableListOf<Channel>()
+        var currentCategory = sourceCategory ?: "未分类"
+
+        for (line in content.lines()) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) continue
+
+            if (trimmed.endsWith("#genre#", ignoreCase = true)) {
+                val cat = trimmed.substringBeforeLast(",").trim()
+                if (cat.isNotEmpty()) currentCategory = cat
+                continue
+            }
+
+            if (trimmed.startsWith("#")) continue
+
+            val commaIdx = trimmed.indexOf(",")
+            if (commaIdx <= 0) continue
+
+            val name = trimmed.substring(0, commaIdx).trim()
+            val url = trimmed.substring(commaIdx + 1).trim()
+
+            if (name.isEmpty() || url.isEmpty()) continue
+
+            channels.add(Channel(
+                id = UUID.randomUUID().toString(),
+                name = name,
+                url = url,
+                category = currentCategory,
+                sortOrder = channels.size
+            ))
         }
         return channels
     }

@@ -1,6 +1,8 @@
 package com.wangyg.tvliveplayer.player
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.TextureView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -37,6 +39,10 @@ class TVPlayer @Inject constructor(private val context: Context) {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private var urlList: List<String> = emptyList()
+    private var urlIndex: Int = 0
+    private var retryHandler: Handler? = null
+
     fun initialize(textureView: TextureView) {
         if (exoPlayer != null) {
             exoPlayer?.setVideoTextureView(textureView)
@@ -53,6 +59,7 @@ class TVPlayer @Inject constructor(private val context: Context) {
             }
             .build()
         dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
+        retryHandler = Handler(Looper.getMainLooper())
         exoPlayer = ExoPlayer.Builder(context).build()
             .also { player ->
                 player.setVideoTextureView(textureView)
@@ -63,7 +70,6 @@ class TVPlayer @Inject constructor(private val context: Context) {
                             Player.STATE_BUFFERING -> PlaybackState.BUFFERING
                             Player.STATE_READY -> PlaybackState.READY
                             Player.STATE_ENDED -> {
-                                // Stream ended — auto-restart for continuous playback
                                 player.seekTo(0)
                                 player.play()
                                 PlaybackState.BUFFERING
@@ -73,24 +79,41 @@ class TVPlayer @Inject constructor(private val context: Context) {
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        _playbackState.value = PlaybackState.ERROR
-                        _errorMessage.value = error.localizedMessage ?: "播放错误"
-                        // Auto-retry once after a short delay
-                        val url = currentUrl
-                        if (url != null) {
-                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                play(url)
+                        val nextIdx = urlIndex + 1
+                        if (nextIdx < urlList.size) {
+                            urlIndex = nextIdx
+                            val nextUrl = urlList[nextIdx]
+                            _errorMessage.value = "正在切换源(${nextIdx + 1}/${urlList.size})..."
+                            retryHandler?.postDelayed({
+                                playCurrent()
                             }, 3000)
+                        } else {
+                            _playbackState.value = PlaybackState.ERROR
+                            _errorMessage.value = error.localizedMessage ?: "所有源均无法播放"
                         }
                     }
                 })
             }
     }
 
-    private var currentUrl: String? = null
+    fun playUrls(urls: List<String>, startIndex: Int = 0) {
+        urlList = urls
+        urlIndex = startIndex.coerceIn(0, (urls.size - 1).coerceAtLeast(0))
+        retryHandler?.removeCallbacksAndMessages(null)
+        if (urls.isEmpty()) {
+            _playbackState.value = PlaybackState.IDLE
+            return
+        }
+        playCurrent()
+    }
 
-    fun play(url: String) {
-        currentUrl = url
+    private fun playCurrent() {
+        if (urlIndex >= urlList.size) {
+            _playbackState.value = PlaybackState.ERROR
+            _errorMessage.value = "所有源均无法播放"
+            return
+        }
+        val url = urlList[urlIndex]
         val dsf = dataSourceFactory
             ?: OkHttpDataSource.Factory(
                 OkHttpClient.Builder()
@@ -126,9 +149,12 @@ class TVPlayer @Inject constructor(private val context: Context) {
     fun isPlaying(): Boolean = exoPlayer?.isPlaying ?: false
 
     fun release() {
+        retryHandler?.removeCallbacksAndMessages(null)
         exoPlayer?.release()
         exoPlayer = null
         dataSourceFactory = null
+        urlList = emptyList()
+        urlIndex = 0
         _playbackState.value = PlaybackState.IDLE
         _errorMessage.value = null
     }
