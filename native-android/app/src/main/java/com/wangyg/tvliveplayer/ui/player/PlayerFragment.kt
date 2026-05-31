@@ -321,9 +321,11 @@ class PlayerFragment : Fragment() {
         if (shouldShow && iconPanel.visibility != View.VISIBLE) {
             iconPanel.visibility = View.VISIBLE
             iconPanel.alpha = 1.0f
-            btnIconSettings.requestFocus()
+            iconSelectedIndex = -1
+            view?.requestFocus()
         } else if (!shouldShow && iconPanel.visibility == View.VISIBLE) {
             iconPanel.visibility = View.GONE
+            iconSelectedIndex = -1
             view?.requestFocus()
         }
     }
@@ -424,17 +426,19 @@ class PlayerFragment : Fragment() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                enterIconSelect()
+                if (!tvPlayer.isPlaying()) {
+                    tvPlayer.resume()
+                    ivPause.visibility = View.GONE
+                } else {
+                    enterIconSelect(pause = true)
+                }
                 true
             }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
-                enterIconSelect()
+                enterIconSelect(focusButton = true)
                 true
             }
-            KeyEvent.KEYCODE_SPACE -> {
-                togglePlayPause()
-                true
-            }
+
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                 viewModel.popPage()
                 true
@@ -443,42 +447,73 @@ class PlayerFragment : Fragment() {
         }
     }
 
-    private fun enterIconSelect() {
+    private fun enterIconSelect(pause: Boolean = false, focusButton: Boolean = false) {
         if (viewModel.state.value.channels.isEmpty()) {
             (activity as? MainActivity)?.showSourceMgmt()
             return
         }
+        if (pause && tvPlayer.isPlaying()) {
+            tvPlayer.pause()
+            ivPause.visibility = View.VISIBLE
+        }
         viewModel.pushPage(Page.ICON)
-        iconSelectedIndex = 0
         iconPanel.visibility = View.VISIBLE
         iconPanel.alpha = 1.0f
-        btnIconSettings.requestFocus()
+        if (focusButton) {
+            iconSelectedIndex = 0
+            btnIconSettings.requestFocus()
+        } else {
+            iconSelectedIndex = -1
+            view?.requestFocus()
+        }
     }
 
     private fun exitIconSelect() {
         viewModel.popPage()
+        iconSelectedIndex = -1
         iconPanel.visibility = View.GONE
         view?.requestFocus()
     }
 
     private fun handleIconKey(keyCode: Int): Boolean {
         return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (iconSelectedIndex < 0) {
+                    iconSelectedIndex = 0
+                    focusIconItem(0)
+                }
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (iconSelectedIndex >= 0) {
+                    iconSelectedIndex = -1
+                    view?.requestFocus()
+                }
+                true
+            }
             KeyEvent.KEYCODE_DPAD_UP -> {
-                iconSelectedIndex = (iconSelectedIndex - 1 + 3) % 3
-                focusIconItem(iconSelectedIndex)
+                if (iconSelectedIndex >= 0) {
+                    iconSelectedIndex = (iconSelectedIndex - 1 + 3) % 3
+                    focusIconItem(iconSelectedIndex)
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                iconSelectedIndex = (iconSelectedIndex + 1) % 3
-                focusIconItem(iconSelectedIndex)
+                if (iconSelectedIndex >= 0) {
+                    iconSelectedIndex = (iconSelectedIndex + 1) % 3
+                    focusIconItem(iconSelectedIndex)
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                onIconAction(iconSelectedIndex)
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                exitIconSelect()
+                if (iconSelectedIndex >= 0) {
+                    onIconAction(iconSelectedIndex)
+                } else {
+                    // No button focused: resume video and exit menu
+                    tvPlayer.resume()
+                    ivPause.visibility = View.GONE
+                    exitIconSelect()
+                }
                 true
             }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
@@ -635,7 +670,9 @@ class PlayerFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        tvPlayer.resume()
+        if (viewModel.state.value.navStack.lastOrNull() != Page.ICON) {
+            tvPlayer.resume()
+        }
     }
 
     override fun onDestroy() {
