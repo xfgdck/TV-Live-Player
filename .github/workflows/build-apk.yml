@@ -58,31 +58,28 @@ jobs:
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Build Release APK
+      - name: Build APK
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
             ./gradlew assembleRelease --no-daemon \
-              -Pandroid.injected.signing.store.file=keystore.jks \
+              -Pandroid.injected.signing.store.file="$(pwd)/keystore.jks" \
               -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
               -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+            echo "APK_PATH=app/build/outputs/apk/release/app-release.apk" >> $GITHUB_ENV
+            echo "APK_NAME=TVLivePlayer-Release" >> $GITHUB_ENV
           else
-            keytool -genkey -v -keystore app/debug.keystore -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android -dname "CN=Debug, OU=Dev, O=TVLivePlayer, L=Unknown, ST=Unknown, C=CN"
-            ./gradlew assembleRelease --no-daemon \
-              -Pandroid.injected.signing.store.file=app/debug.keystore \
-              -Pandroid.injected.signing.store.password=android \
-              -Pandroid.injected.signing.key.alias=androiddebugkey \
-              -Pandroid.injected.signing.key.password=android
+            ./gradlew assembleDebug --no-daemon
+            echo "APK_PATH=app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_ENV
+            echo "APK_NAME=TVLivePlayer-Debug" >> $GITHUB_ENV
           fi
 
-      - name: Upload Release APK
+      - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: TVLivePlayer-Release
-          path: native-android/app/build/outputs/apk/release/app-release*.apk
+          name: ${{ env.APK_NAME }}
+          path: native-android/${{ env.APK_PATH }}
           if-no-files-found: error
 
       - name: Create GitHub Release (on tag push)
