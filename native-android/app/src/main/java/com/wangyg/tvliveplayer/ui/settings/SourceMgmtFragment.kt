@@ -59,7 +59,7 @@ class SourceMgmtFragment : Fragment() {
             .setTitle("在线链接解析")
             .setView(input)
             .setPositiveButton("确定") { _, _ ->
-                val url = input.text.toString().trim()
+                val url = input.text.toString().trim { it <= ' ' || it == '\uFEFF' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u00A0' }
                 if (url.isNotEmpty()) downloadAndParse(url)
             }
             .setNegativeButton("取消", null)
@@ -90,7 +90,7 @@ class SourceMgmtFragment : Fragment() {
             .setTitle("在线链接解析")
             .setView(input)
             .setPositiveButton("确定") { _, _ ->
-                val text = input.text.toString().trim()
+                val text = input.text.toString().trim { it <= ' ' || it == '\uFEFF' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u00A0' }
                 if (text.isNotEmpty()) downloadAndParse(text)
             }
             .setNegativeButton("取消", null)
@@ -98,12 +98,13 @@ class SourceMgmtFragment : Fragment() {
     }
 
     private fun addChannelFromQr(result: QrScanResult) {
+        val cleanUrl = result.url.trim { it <= ' ' || it == '\uFEFF' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u00A0' }
         lifecycleScope.launch {
             channelRepository.addChannels(listOf(
                 Channel(
                     id = java.util.UUID.randomUUID().toString(),
-                    name = result.name,
-                    url = result.url,
+                    name = result.name.trim(),
+                    url = cleanUrl,
                     category = result.category.ifEmpty { "自定义" },
                     logo = result.logo.ifEmpty { null }
                 )
@@ -182,6 +183,9 @@ class SourceMgmtFragment : Fragment() {
         return okhttp3.OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
             .hostnameVerifier { _, _ -> true }
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .build()
     }
 
