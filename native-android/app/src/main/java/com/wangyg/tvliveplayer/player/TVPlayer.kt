@@ -62,7 +62,12 @@ class TVPlayer @Inject constructor(private val context: Context) {
                             Player.STATE_IDLE -> PlaybackState.IDLE
                             Player.STATE_BUFFERING -> PlaybackState.BUFFERING
                             Player.STATE_READY -> PlaybackState.READY
-                            Player.STATE_ENDED -> PlaybackState.IDLE
+                            Player.STATE_ENDED -> {
+                                // Stream ended — auto-restart for continuous playback
+                                player.seekTo(0)
+                                player.play()
+                                PlaybackState.BUFFERING
+                            }
                             else -> PlaybackState.IDLE
                         }
                     }
@@ -70,12 +75,22 @@ class TVPlayer @Inject constructor(private val context: Context) {
                     override fun onPlayerError(error: PlaybackException) {
                         _playbackState.value = PlaybackState.ERROR
                         _errorMessage.value = error.localizedMessage ?: "播放错误"
+                        // Auto-retry once after a short delay
+                        val url = currentUrl
+                        if (url != null) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                play(url)
+                            }, 3000)
+                        }
                     }
                 })
             }
     }
 
+    private var currentUrl: String? = null
+
     fun play(url: String) {
+        currentUrl = url
         val dsf = dataSourceFactory
             ?: OkHttpDataSource.Factory(
                 OkHttpClient.Builder()

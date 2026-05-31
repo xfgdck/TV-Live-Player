@@ -183,15 +183,13 @@ class PlayerFragment : Fragment() {
                     }
                     PlaybackState.IDLE -> {
                         progressBar.visibility = View.GONE
-                        tvError.visibility = View.GONE
                         if (viewModel.state.value.channels.isEmpty()) {
                             ivPause.visibility = View.GONE
+                            tvError.visibility = View.GONE
                             tvWelcome.visibility = View.GONE
                             tvEmptyGuide.visibility = View.VISIBLE
                         } else {
-                            ivPause.visibility = View.VISIBLE
-                            tvWelcome.visibility = View.GONE
-                            tvEmptyGuide.visibility = View.GONE
+                            // IDLE with channels means initial state — leave pause icon hidden
                         }
                     }
                 }
