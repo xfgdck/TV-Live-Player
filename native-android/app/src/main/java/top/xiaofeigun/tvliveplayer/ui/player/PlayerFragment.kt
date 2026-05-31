@@ -212,11 +212,12 @@ class PlayerFragment : Fragment() {
     }
 
     private fun updatePlayer(state: PlayerUiState) {
-        val channel = state.currentChannel
         if (state.showOsd) {
             osdLayout.visibility = View.VISIBLE
-            osdHandler.removeCallbacksAndMessages(null)
-            osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
+            if (state.navStack.lastOrNull() == Page.PLAYER) {
+                osdHandler.removeCallbacksAndMessages(null)
+                osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
+            }
         }
     }
 
@@ -224,6 +225,10 @@ class PlayerFragment : Fragment() {
         if (state.currentChannel != null) {
             tvChannelName.text = state.currentChannel.name
             osdLayout.visibility = View.VISIBLE
+            if (state.navStack.lastOrNull() == Page.PLAYER) {
+                osdHandler.removeCallbacksAndMessages(null)
+                osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
+            }
         } else {
             osdLayout.visibility = View.GONE
         }
@@ -652,8 +657,10 @@ class PlayerFragment : Fragment() {
 
     private fun showOsdTemp() {
         osdLayout.visibility = View.VISIBLE
-        osdHandler.removeCallbacksAndMessages(null)
-        osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
+        if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
+            osdHandler.removeCallbacksAndMessages(null)
+            osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
+        }
     }
 
     private fun togglePlayPause() {
