@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -122,7 +123,20 @@ class SourceMgmtFragment : Fragment() {
             .show()
     }
 
+    private fun showLoadingDialog(): AlertDialog {
+        val progressBar = ProgressBar(requireActivity(), null, android.R.attr.progressBarStyleLarge)
+        progressBar.isIndeterminate = true
+        val padding = resources.getDimensionPixelSize(android.R.dimen.app_icon_size)
+        progressBar.setPadding(padding, padding / 2, padding, padding / 2)
+        return AlertDialog.Builder(requireActivity())
+            .setMessage("正在解析中，请稍候...")
+            .setView(progressBar)
+            .setCancelable(false)
+            .show()
+    }
+
     private fun downloadAndParse(url: String) {
+        val loadingDialog = showLoadingDialog()
         lifecycleScope.launch {
             try {
                 val client = buildUnsafeOkHttpClient()
@@ -130,8 +144,10 @@ class SourceMgmtFragment : Fragment() {
                 val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
                 val body = response.body?.string() ?: return@launch
                 val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(body, null)
+                loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
+                loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
