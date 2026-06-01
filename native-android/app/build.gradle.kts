@@ -13,8 +13,16 @@ android {
         applicationId = "top.xiaofeigun.tvliveplayer"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
+        versionName = project.findProperty("versionName")?.toString() ?: "1.0.0"
+    }
+
+    applicationVariants.configureEach {
+        outputs.configureEach {
+            if (this is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
+                outputFileName = "TV-Live-Player-${versionName}-${buildType.name}.apk"
+            }
+        }
     }
 
     buildTypes {

@@ -62,43 +62,43 @@ jobs:
 
       - name: Build APK
         run: |
+          VERSION_CODE=$(date +%Y%m%d)
+          VERSION_NAME=$(date +%Y.%m.%d)
+          GRADLE_OPTS="-PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME"
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
             ./gradlew assembleRelease --no-daemon \
+              $GRADLE_OPTS \
               -Pandroid.injected.signing.store.file="$(pwd)/keystore.jks" \
               -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
               -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-            echo "APK_PATH=app/build/outputs/apk/release/app-release.apk" >> $GITHUB_ENV
-            echo "APK_NAME=TVLivePlayer-Release" >> $GITHUB_ENV
           else
-            ./gradlew assembleDebug --no-daemon
-            echo "APK_PATH=app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_ENV
-            echo "APK_NAME=TVLivePlayer-Debug" >> $GITHUB_ENV
+            ./gradlew assembleDebug --no-daemon $GRADLE_OPTS
           fi
+          echo "APK_VERSION=$VERSION_NAME" >> $GITHUB_ENV
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ env.APK_NAME }}
-          path: native-android/${{ env.APK_PATH }}
+          name: TV-Live-Player-${{ env.APK_VERSION }}
+          path: native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
           if-no-files-found: error
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: auto-build-${{ github.run_number }}
-          name: 自动构建 #${{ github.run_number }}
+          tag_name: v${{ env.APK_VERSION }}
+          name: v${{ env.APK_VERSION }}
           body: |
-            ## TV-Live-Player 自动构建
+            ## TV-Live-Player ${{ env.APK_VERSION }}
 
-            - 构建编号: ${{ github.run_number }}
+            - 版本: ${{ env.APK_VERSION }}
             - 提交: ${{ github.sha }}
             - 分支: ${{ github.ref_name }}
-            - 触发: ${{ github.event_name }}
           files: |
-            native-android/app/build/outputs/apk/*/app-*.apk
+            native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
           draft: false
           prerelease: false
           make_latest: true
