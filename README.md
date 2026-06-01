@@ -22,7 +22,7 @@
 
 ### 应用截图
 
-（待补充）
+![源管理界面](screenshot/config-page.png)
 
 ### 使用方法
 
