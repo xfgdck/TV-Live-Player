@@ -1,17 +1,35 @@
+<div align="center">
+
 # TV-Live-Player
 
-Android TV 直播播放器，支持 M3U / TXT 直播源，可通过手机扫码添加频道。
+**Android TV 直播播放器，支持 M3U / TXT 直播源，可通过手机扫码添加频道。**
 
-## 功能
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/xfgdck/TV-Live-Player?color=blue&label=最新版本)](https://github.com/xfgdck/TV-Live-Player/releases)
+[![Downloads](https://img.shields.io/github/downloads/xfgdck/TV-Live-Player/total?color=success&label=总下载量)](https://github.com/xfgdck/TV-Live-Player/releases)
+[![Platform](https://img.shields.io/badge/平台-Android_TV-brightgreen?logo=android)](https://github.com/xfgdck/TV-Live-Player/releases)
+[![License](https://img.shields.io/badge/许可-免费软件-orange)](https://github.com/xfgdck/TV-Live-Player/releases)
 
-- 全屏直播播放，支持 HLS 等多协议
-- 多直播源自动换源，断流自动恢复
-- 分类频道选择、收藏频道
-- 手机扫码添加频道（需同一 WiFi）
-- 源管理：URL 在线导入 / 二维码扫码 / 清空节目
+[**📥 下载最新版 APK**](https://github.com/xfgdck/TV-Live-Player/releases) | [**🐛 反馈问题**](https://github.com/xfgdck/TV-Live-Player/issues)
 
-## 下载
+</div>
 
-前往 [Releases](https://github.com/xfgdck/TV-Live-Player/releases) 下载最新 APK。
+### 主要特性
+
+**多源播放**：支持 M3U / TXT 格式直播源，同一频道可配置多个备用地址，自动换源。  
+**手机扫码**：局域网内手机扫码即可添加 M3U 链接、单个频道或上传文件，无需在电视上输入。  
+**分类管理**：按分类浏览频道，支持收藏、移动、删除等管理操作。  
+**断流恢复**：播放中断自动重连，遍历所有备用 URL，尽可能保持播放。  
+**远程遥控**：完美适配 Android TV 遥控器（方向键 / OK / 返回 / 菜单），同时也支持触摸屏操作。  
+
+### 应用截图
+
+（待补充）
+
+### 使用方法
+
+1. 前往 [Releases](https://github.com/xfgdck/TV-Live-Player/releases) 下载最新 APK
+2. 安装到 Android TV 或电视盒子上
+3. 打开应用，进入「源管理」→「从 URL 导入」添加直播源
+4. 也可使用「扫码添加」功能，手机扫码后提交直播源链接
 
 > 详细设计说明参见 [DESIGN.md](./DESIGN.md)
