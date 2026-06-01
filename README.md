@@ -2,12 +2,11 @@
 
 # TV-Live-Player
 
-**Android TV 直播播放器，支持 M3U / TXT 直播源，可通过手机扫码添加频道。**
+**Android TV 直播播放器，支持 M3U / TXT 直播源，可通过手机扫码配置。**
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/xfgdck/TV-Live-Player?color=blue&label=最新版本)](https://github.com/xfgdck/TV-Live-Player/releases)
 [![Downloads](https://img.shields.io/github/downloads/xfgdck/TV-Live-Player/total?color=success&label=总下载量)](https://github.com/xfgdck/TV-Live-Player/releases)
 [![Platform](https://img.shields.io/badge/平台-Android_TV-brightgreen?logo=android)](https://github.com/xfgdck/TV-Live-Player/releases)
-[![License](https://img.shields.io/badge/许可-免费软件-orange)](https://github.com/xfgdck/TV-Live-Player/releases)
 
 [**📥 下载最新版 APK**](https://github.com/xfgdck/TV-Live-Player/releases) | [**🐛 反馈问题**](https://github.com/xfgdck/TV-Live-Player/issues)
 
@@ -29,7 +28,5 @@
 
 1. 前往 [Releases](https://github.com/xfgdck/TV-Live-Player/releases) 下载最新 APK
 2. 安装到 Android TV 或电视盒子上
-3. 打开应用，进入「源管理」→「从 URL 导入」添加直播源
-4. 也可使用「扫码添加」功能，手机扫码后提交直播源链接
+3. 打开应用，进入「源管理」→「手机扫码」/「手动输入」添加直播源 
 
-> 详细设计说明参见 [DESIGN.md](./DESIGN.md)
