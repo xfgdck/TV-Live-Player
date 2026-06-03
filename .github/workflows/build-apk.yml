@@ -96,13 +96,16 @@ jobs:
             git push origin --delete "$TAG" 2>/dev/null || true
           fi
           # Create new release
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes "## TV-Live-Player $APK_VERSION
+          cat > release-notes.md << EOF
+## TV-Live-Player $APK_VERSION
 
 - 版本: $APK_VERSION
 - 提交: ${{ github.sha }}
-- 分支: ${{ github.ref_name }}" \
+- 分支: ${{ github.ref_name }}
+EOF
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
             --latest \
             native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
         env:
