@@ -42,7 +42,6 @@ class PlayerFragment : Fragment() {
     private val viewModel: PlayerViewModel by viewModels(ownerProducer = { requireActivity() })
 
     private lateinit var surfaceView: TextureView
-    private lateinit var osdLayout: View
     private lateinit var tvChannelName: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var ivPause: ImageView
@@ -60,9 +59,7 @@ class PlayerFragment : Fragment() {
     private lateinit var btnIconSource: ImageButton
     private lateinit var btnIconFavorite: ImageButton
 
-    private val osdHandler = Handler(Looper.getMainLooper())
     private val exitHandler = Handler(Looper.getMainLooper())
-    private val OSD_TIMEOUT_MS = 3000L
     private var exitConfirmRunnable: Runnable? = null
     private var lastPlayedUrl: String? = null
     private var redirectingToSourceMgmt = false
@@ -77,7 +74,6 @@ class PlayerFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         surfaceView = view.findViewById(R.id.surface_view)
-        osdLayout = view.findViewById(R.id.osd_layout)
         tvChannelName = view.findViewById(R.id.tv_channel_name)
         progressBar = view.findViewById(R.id.progress_bar)
         ivPause = view.findViewById(R.id.iv_pause)
@@ -125,7 +121,6 @@ class PlayerFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.state.collect { state ->
-                    updatePlayer(state)
                     updateChannelInfo(state)
                     updateIconFavorite(state)
                     updateCategoryOverlay(state)
@@ -211,26 +206,9 @@ class PlayerFragment : Fragment() {
 
     }
 
-    private fun updatePlayer(state: PlayerUiState) {
-        if (state.showOsd) {
-            osdLayout.visibility = View.VISIBLE
-            if (state.navStack.lastOrNull() == Page.PLAYER) {
-                osdHandler.removeCallbacksAndMessages(null)
-                osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
-            }
-        }
-    }
-
     private fun updateChannelInfo(state: PlayerUiState) {
         if (state.currentChannel != null) {
             tvChannelName.text = state.currentChannel.name
-            osdLayout.visibility = View.VISIBLE
-            if (state.navStack.lastOrNull() == Page.PLAYER) {
-                osdHandler.removeCallbacksAndMessages(null)
-                osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
-            }
-        } else {
-            osdLayout.visibility = View.GONE
         }
     }
 
@@ -366,7 +344,6 @@ class PlayerFragment : Fragment() {
                 if (abs(diffY) > 100) {
                     if (diffY < 0) viewModel.nextChannel()
                     else viewModel.previousChannel()
-                    showOsdTemp()
                     return true
                 }
                 return false
@@ -420,12 +397,10 @@ class PlayerFragment : Fragment() {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
                 viewModel.previousChannel()
-                showOsdTemp()
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 viewModel.nextChannel()
-                showOsdTemp()
                 true
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
@@ -681,14 +656,6 @@ class PlayerFragment : Fragment() {
             .show()
     }
 
-    private fun showOsdTemp() {
-        osdLayout.visibility = View.VISIBLE
-        if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
-            osdHandler.removeCallbacksAndMessages(null)
-            osdHandler.postDelayed({ osdLayout.visibility = View.GONE }, OSD_TIMEOUT_MS)
-        }
-    }
-
     private fun togglePlayPause() {
         if (tvPlayer.isPlaying()) {
             tvPlayer.pause()
@@ -713,7 +680,6 @@ class PlayerFragment : Fragment() {
     override fun onDestroy() {
         super.onDestroy()
         tvPlayer.release()
-        osdHandler.removeCallbacksAndMessages(null)
         exitHandler.removeCallbacksAndMessages(null)
     }
 }

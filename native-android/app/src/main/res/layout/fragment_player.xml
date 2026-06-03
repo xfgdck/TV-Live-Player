@@ -72,14 +72,13 @@
         android:gravity="center"
         android:visibility="gone" />
 
-    <!-- Channel info (top-left) -->
+    <!-- Channel info (top-left, currently hidden) -->
     <LinearLayout
         android:id="@+id/osd_layout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:visibility="gone"
         android:background="#66000000"
         android:orientation="vertical"
         android:padding="10dp">
@@ -88,7 +87,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/text_primary"
-            android:textSize="22sp"
+            android:textSize="26sp"
             android:textStyle="bold" />
     </LinearLayout>
 
