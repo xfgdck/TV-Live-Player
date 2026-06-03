@@ -85,23 +85,22 @@ jobs:
           path: native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
           if-no-files-found: error
 
-      - name: Create GitHub Release (replace if same version)
+      - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        run: |
-          TAG="v${APK_VERSION}"
-          # Delete existing release and tag if same version already exists
-          if gh release view "$TAG" --json tagName --jq '.tagName' &>/dev/null; then
-            echo "Release $TAG already exists, deleting..."
-            gh release delete "$TAG" --yes
-            git push origin --delete "$TAG" 2>/dev/null || true
-          fi
-          # Create new release
-          printf '## TV-Live-Player %s\n\n- 版本: %s\n- 提交: %s\n- 分支: %s\n' \
-            "$APK_VERSION" "$APK_VERSION" "${{ github.sha }}" "${{ github.ref_name }}" > release-notes.md
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file release-notes.md \
-            --latest \
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ env.APK_VERSION }}
+          name: v${{ env.APK_VERSION }}
+          body: |
+            ## TV-Live-Player ${{ env.APK_VERSION }}
+
+            - 版本: ${{ env.APK_VERSION }}
+            - 提交: ${{ github.sha }}
+            - 分支: ${{ github.ref_name }}
+          files: |
             native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
+          draft: false
+          prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
