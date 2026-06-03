@@ -96,13 +96,8 @@ jobs:
             git push origin --delete "$TAG" 2>/dev/null || true
           fi
           # Create new release
-          cat > release-notes.md << EOF
-## TV-Live-Player $APK_VERSION
-
-- 版本: $APK_VERSION
-- 提交: ${{ github.sha }}
-- 分支: ${{ github.ref_name }}
-EOF
+          printf '## TV-Live-Player %s\n\n- 版本: %s\n- 提交: %s\n- 分支: %s\n' \
+            "$APK_VERSION" "$APK_VERSION" "${{ github.sha }}" "${{ github.ref_name }}" > release-notes.md
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
