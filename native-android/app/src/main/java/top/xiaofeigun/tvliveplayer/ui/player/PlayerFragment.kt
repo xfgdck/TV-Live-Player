@@ -241,8 +241,8 @@ class PlayerFragment : Fragment() {
                 val isSelected = index == state.selectedCategoryIndex
                 val tab = TextView(requireContext()).apply {
                     text = cat
-                    textSize = 16f
-                    setPadding(28, 14, 28, 14)
+                    textSize = 15f
+                    setPadding(24, 10, 24, 10)
                     isFocusable = true
                     isClickable = true
                     setOnClickListener { viewModel.selectCategory(index) }
@@ -251,10 +251,10 @@ class PlayerFragment : Fragment() {
                     }
                     if (isSelected) {
                         setTextColor(resources.getColor(R.color.white, null))
-                        setBackgroundColor(resources.getColor(R.color.accent, null))
+                        setBackgroundResource(R.drawable.tab_active_bg)
                     } else {
                         setTextColor(resources.getColor(R.color.text_secondary, null))
-                        setBackgroundColor(resources.getColor(R.color.card_background, null))
+                        setBackgroundResource(R.drawable.tab_inactive_bg)
                     }
                 }
                 categoryTabs.addView(tab)
@@ -268,7 +268,8 @@ class PlayerFragment : Fragment() {
                 val item = TextView(requireContext()).apply {
                     text = channel.name
                     textSize = 18f
-                    setPadding(20, 12, 20, 12)
+                    setPadding(24, 14, 24, 14)
+                    setMinHeight(48)
                     isFocusable = true
                     isClickable = true
                     setOnClickListener { viewModel.focusCategoryChannel(index) }
@@ -277,13 +278,13 @@ class PlayerFragment : Fragment() {
                     }
                     if (isPlaying) {
                         setTextColor(resources.getColor(R.color.white, null))
-                        setBackgroundResource(R.drawable.focus_bg_playing)
+                        setBackgroundResource(R.drawable.channel_item_playing)
                     } else if (isFocused) {
                         setTextColor(resources.getColor(R.color.white, null))
-                        setBackgroundResource(R.drawable.focus_bg_selected)
+                        setBackgroundResource(R.drawable.channel_item_focused)
                     } else {
                         setTextColor(resources.getColor(R.color.text_secondary, null))
-                        setBackgroundColor(0)
+                        setBackgroundResource(R.drawable.channel_item_normal)
                     }
                 }
                 categoryChannelList.addView(item)
