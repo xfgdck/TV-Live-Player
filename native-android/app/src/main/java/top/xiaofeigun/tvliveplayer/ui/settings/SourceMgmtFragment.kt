@@ -54,7 +54,7 @@ class SourceMgmtFragment : Fragment() {
     private fun showUrlDialog() {
         val input = EditText(requireActivity())
         input.hint = "输入 M3U 链接地址"
-        input.setText("https://ghfast.top/raw.githubusercontent.com/Supprise0901/TVBox_live/main/live.txt")
+        input.setText("https://raw.githubusercontent.com/Supprise0901/TVBox_live/main/live.txt")
         AlertDialog.Builder(requireActivity())
             .setTitle("在线链接解析")
             .setView(input)
