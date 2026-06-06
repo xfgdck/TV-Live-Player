@@ -411,12 +411,7 @@ class PlayerFragment : Fragment() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (!tvPlayer.isPlaying()) {
-                    tvPlayer.resume()
-                    ivPause.visibility = View.GONE
-                } else {
-                    enterIconSelect(pause = true)
-                }
+                togglePlayPause()
                 true
             }
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS -> {
