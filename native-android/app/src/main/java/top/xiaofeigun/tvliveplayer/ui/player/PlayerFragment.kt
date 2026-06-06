@@ -8,7 +8,7 @@ import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
-import android.view.TextureView
+import androidx.media3.ui.PlayerView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -41,7 +41,7 @@ class PlayerFragment : Fragment() {
     @Inject lateinit var tvPlayer: TVPlayer
     private val viewModel: PlayerViewModel by viewModels(ownerProducer = { requireActivity() })
 
-    private lateinit var surfaceView: TextureView
+    private lateinit var playerView: PlayerView
     private lateinit var tvChannelName: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var ivPause: ImageView
@@ -73,7 +73,7 @@ class PlayerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        surfaceView = view.findViewById(R.id.surface_view)
+        playerView = view.findViewById(R.id.player_view)
         tvChannelName = view.findViewById(R.id.tv_channel_name)
         progressBar = view.findViewById(R.id.progress_bar)
         ivPause = view.findViewById(R.id.iv_pause)
@@ -91,7 +91,8 @@ class PlayerFragment : Fragment() {
         btnIconSource = view.findViewById(R.id.btn_icon_source)
         btnIconFavorite = view.findViewById(R.id.btn_icon_favorite)
 
-        tvPlayer.initialize(surfaceView)
+        tvPlayer.initialize()
+        playerView.player = tvPlayer.player
         setupTouch()
 
         btnIconSettings.setOnClickListener { onIconAction(0) }
@@ -140,7 +141,8 @@ class PlayerFragment : Fragment() {
                         lastPlayedUrl = null
                         ivPause.visibility = View.GONE
                         tvPlayer.release()
-                        tvPlayer.initialize(surfaceView)
+                        tvPlayer.initialize()
+                        playerView.player = tvPlayer.player
                     }
                     if (state.channels.isEmpty() && state.channelsLoaded && !redirectingToSourceMgmt) {
                         redirectingToSourceMgmt = true
@@ -679,6 +681,7 @@ class PlayerFragment : Fragment() {
     }
 
     override fun onDestroy() {
+        playerView.player = null
         super.onDestroy()
         tvPlayer.release()
         exitHandler.removeCallbacksAndMessages(null)

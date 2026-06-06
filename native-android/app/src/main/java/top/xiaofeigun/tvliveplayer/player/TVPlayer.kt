@@ -3,7 +3,6 @@ package top.xiaofeigun.tvliveplayer.player
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.view.TextureView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -30,7 +29,8 @@ enum class PlaybackState {
 @Singleton
 class TVPlayer @Inject constructor(private val context: Context) {
 
-    private var exoPlayer: ExoPlayer? = null
+    private var _exoPlayer: ExoPlayer? = null
+    val player: ExoPlayer? get() = _exoPlayer
     private var dataSourceFactory: DataSource.Factory? = null
 
     private val _playbackState = MutableStateFlow(PlaybackState.IDLE)
@@ -43,11 +43,8 @@ class TVPlayer @Inject constructor(private val context: Context) {
     private var urlIndex: Int = 0
     private var retryHandler: Handler? = null
 
-    fun initialize(textureView: TextureView) {
-        if (exoPlayer != null) {
-            exoPlayer?.setVideoTextureView(textureView)
-            return
-        }
+    fun initialize() {
+        if (_exoPlayer != null) return
         val okHttpClient = OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
@@ -60,9 +57,8 @@ class TVPlayer @Inject constructor(private val context: Context) {
             .build()
         dataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
         retryHandler = Handler(Looper.getMainLooper())
-        exoPlayer = ExoPlayer.Builder(context).build()
+        _exoPlayer = ExoPlayer.Builder(context).build()
             .also { player ->
-                player.setVideoTextureView(textureView)
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         _playbackState.value = when (state) {
@@ -122,7 +118,7 @@ class TVPlayer @Inject constructor(private val context: Context) {
                     .build()
             )
         val mediaSource = createMediaSource(url, dsf)
-        exoPlayer?.apply {
+        _exoPlayer?.apply {
             setMediaSource(mediaSource)
             prepare()
             play()
@@ -139,19 +135,19 @@ class TVPlayer @Inject constructor(private val context: Context) {
     }
 
     fun pause() {
-        exoPlayer?.pause()
+        _exoPlayer?.pause()
     }
 
     fun resume() {
-        exoPlayer?.play()
+        _exoPlayer?.play()
     }
 
-    fun isPlaying(): Boolean = exoPlayer?.isPlaying ?: false
+    fun isPlaying(): Boolean = _exoPlayer?.isPlaying ?: false
 
     fun release() {
         retryHandler?.removeCallbacksAndMessages(null)
-        exoPlayer?.release()
-        exoPlayer = null
+        _exoPlayer?.release()
+        _exoPlayer = null
         dataSourceFactory = null
         urlList = emptyList()
         urlIndex = 0
