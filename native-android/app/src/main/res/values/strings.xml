@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">万能电视直播</string>
+    <string name="app_name">TV Player</string>
     <string name="channel_browse_title">频道列表</string>
     <string name="loading">正在连接直播流...</string>
     <string name="error_tip">播放失败，请重试或切换频道</string>

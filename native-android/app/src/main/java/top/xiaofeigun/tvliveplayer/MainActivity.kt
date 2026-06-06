@@ -8,7 +8,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.activity.viewModels
 import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var channelRepository: ChannelRepository
     @Inject lateinit var appPreferences: AppPreferences
