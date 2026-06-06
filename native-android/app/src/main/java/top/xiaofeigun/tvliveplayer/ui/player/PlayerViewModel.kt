@@ -297,12 +297,20 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun toggleFavorite() {
-        val channel = _state.value.currentChannel ?: run {
-            return
-        }
+        val channel = _state.value.currentChannel ?: return
+        toggleFavorite(channel.id)
+    }
+
+    fun toggleFavorite(channelId: String) {
         viewModelScope.launch {
-            val isFav = repository.toggleFavorite(channel.id)
-            _state.update { it.copy(isFavorite = isFav) }
+            repository.toggleFavorite(channelId)
+            val state = _state.value
+            val isFav = state.currentChannel?.let { repository.isFavorite(it.id) } ?: false
+            val cat = state.allCategories.getOrNull(state.selectedCategoryIndex)
+            val updatedChannels = if (cat != null) repository.getChannelsByCategory(cat).first() else state.categoryChannels
+            _state.update {
+                it.copy(categoryChannels = updatedChannels, isFavorite = isFav)
+            }
         }
     }
 

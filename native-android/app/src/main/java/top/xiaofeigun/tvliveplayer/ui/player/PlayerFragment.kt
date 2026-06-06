@@ -274,14 +274,11 @@ class PlayerFragment : Fragment() {
                     setMinHeight(48)
                     isFocusable = true
                     isClickable = true
-                    setOnClickListener { viewModel.focusCategoryChannel(index) }
+                    setOnClickListener { viewModel.confirmCategorySelect() }
                     setOnFocusChangeListener { _, hasFocus ->
                         if (hasFocus) viewModel.focusCategoryChannel(index)
                     }
-                    if (isPlaying) {
-                        setTextColor(resources.getColor(R.color.white, null))
-                        setBackgroundResource(R.drawable.channel_item_playing)
-                    } else if (isFocused) {
+                    if (isFocused) {
                         setTextColor(resources.getColor(R.color.white, null))
                         setBackgroundResource(R.drawable.channel_item_focused)
                     } else {
@@ -300,6 +297,7 @@ class PlayerFragment : Fragment() {
                 } else if (focused.bottom > scrollY + viewHeight) {
                     categoryScroll.smoothScrollTo(0, focused.bottom - viewHeight)
                 }
+                focused.requestFocus()
             }
         }
     }
@@ -310,11 +308,9 @@ class PlayerFragment : Fragment() {
             iconPanel.visibility = View.VISIBLE
             iconPanel.alpha = 1.0f
             iconSelectedIndex = -1
-            view?.requestFocus()
         } else if (!shouldShow && iconPanel.visibility == View.VISIBLE) {
             iconPanel.visibility = View.GONE
             iconSelectedIndex = -1
-            view?.requestFocus()
         }
     }
 
@@ -444,7 +440,6 @@ class PlayerFragment : Fragment() {
             btnIconSettings.requestFocus()
         } else {
             iconSelectedIndex = -1
-            view?.requestFocus()
         }
     }
 
@@ -452,7 +447,6 @@ class PlayerFragment : Fragment() {
         viewModel.popPage()
         iconSelectedIndex = -1
         iconPanel.visibility = View.GONE
-        view?.requestFocus()
     }
 
     private fun handleIconKey(keyCode: Int): Boolean {
@@ -467,7 +461,6 @@ class PlayerFragment : Fragment() {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (iconSelectedIndex >= 0) {
                     iconSelectedIndex = -1
-                    view?.requestFocus()
                 }
                 true
             }
@@ -599,7 +592,7 @@ class PlayerFragment : Fragment() {
             AlertDialog.Builder(requireActivity())
                 .setTitle(channel.name)
                 .setItems(arrayOf("取消收藏")) { _, _ ->
-                    viewModel.toggleFavorite()
+                    viewModel.toggleFavorite(channel.id)
                     Toast.makeText(requireContext(), "已取消收藏", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("返回", null)
