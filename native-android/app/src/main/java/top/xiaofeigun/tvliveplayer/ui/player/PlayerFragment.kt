@@ -63,6 +63,7 @@ class PlayerFragment : Fragment() {
     private var exitConfirmRunnable: Runnable? = null
     private var lastPlayedUrl: String? = null
     private var redirectingToSourceMgmt = false
+    private var userPaused = false
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -649,9 +650,11 @@ class PlayerFragment : Fragment() {
 
     private fun togglePlayPause() {
         if (tvPlayer.isPlaying()) {
+            userPaused = true
             tvPlayer.pause()
             ivPause.visibility = View.VISIBLE
         } else {
+            userPaused = false
             tvPlayer.resume()
             ivPause.visibility = View.GONE
         }
@@ -659,11 +662,12 @@ class PlayerFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        tvPlayer.pause()
     }
 
     override fun onResume() {
         super.onResume()
-        if (viewModel.state.value.navStack.lastOrNull() != Page.ICON) {
+        if (!userPaused && viewModel.state.value.navStack.lastOrNull() != Page.ICON) {
             tvPlayer.resume()
         }
     }
