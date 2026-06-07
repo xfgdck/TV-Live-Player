@@ -26,7 +26,7 @@
         android:layout_width="64dp"
         android:layout_height="64dp"
         android:layout_gravity="center"
-        android:src="@drawable/ic_pause"
+        android:src="@drawable/ic_play"
         android:visibility="gone" />
 
     <LinearLayout
@@ -132,7 +132,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginTop="6dp"
-            android:src="@drawable/ic_source"
+            android:src="@drawable/ic_edit"
             android:background="@drawable/menu_item_bg"
             android:scaleType="centerInside"
             android:padding="10dp"
