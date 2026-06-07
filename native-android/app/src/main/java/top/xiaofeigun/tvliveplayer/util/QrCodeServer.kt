@@ -6,7 +6,7 @@ import java.io.OutputStreamWriter
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
-import java.net.URLDecoder
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -42,7 +42,7 @@ class QrCodeServer(private val port: Int = 0) {
         try {
             while (!socket.isClosed) {
                 val client = socket.accept()
-                val reader = BufferedReader(InputStreamReader(client.getInputStream()))
+                val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.UTF_8))
                 val requestLine = reader.readLine() ?: continue
                 val parts = requestLine.split(" ")
                 val method = parts.getOrElse(0) { "" }
@@ -59,9 +59,11 @@ class QrCodeServer(private val port: Int = 0) {
 
                 if (method == "POST" && path == "/submit") {
                     val body = if (contentLength > 0) {
-                        CharArray(contentLength).also { reader.read(it) }.concatToString()
+                        val chars = CharArray(contentLength)
+                        val totalRead = reader.read(chars)
+                        if (totalRead <= 0) "" else String(chars, 0, totalRead)
                     } else {
-                        reader.readLine() ?: ""
+                        ""
                     }
                     val out = OutputStreamWriter(client.getOutputStream())
                     val result = parseJson(body)
@@ -95,22 +97,18 @@ class QrCodeServer(private val port: Int = 0) {
 
     private fun parseJson(body: String): QrScanResult? {
         return try {
-            val clean = body.trim()
-            if (!clean.startsWith("{") || !clean.endsWith("}")) return null
-            fun getStr(key: String): String {
-                val regex = "\"$key\"\\s*:\\s*\"([^\"]*)\"".toRegex()
-                return regex.find(clean)?.groupValues?.getOrElse(1) { "" }?.let {
-                    it.replace("\\n", "\n").replace("\\r", "\r")
-                        .replace("\\t", "\t").replace("\\\\", "\\")
-                } ?: ""
-            }
-            val type = getStr("type")
+            val root = com.google.gson.JsonParser.parseString(body).asJsonObject
+            val type = root.get("type")?.asString ?: return null
             when (type) {
-                "m3u_url" -> QrScanResult(type = type, url = getStr("url"))
-                "channel" -> QrScanResult(type = type, url = getStr("url"), name = getStr("name"),
-                    category = getStr("category"), logo = getStr("logo"))
-                "file" -> QrScanResult(type = type, fileName = getStr("name"),
-                    fileContent = getStr("content"))
+                "m3u_url" -> QrScanResult(type = type, url = root.get("url")?.asString ?: "")
+                "channel" -> QrScanResult(type = type,
+                    url = root.get("url")?.asString ?: "",
+                    name = root.get("name")?.asString ?: "",
+                    category = root.get("category")?.asString ?: "",
+                    logo = root.get("logo")?.asString ?: "")
+                "file" -> QrScanResult(type = type,
+                    fileName = root.get("name")?.asString ?: "",
+                    fileContent = root.get("content")?.asString ?: "")
                 else -> null
             }
         } catch (_: Exception) { null }

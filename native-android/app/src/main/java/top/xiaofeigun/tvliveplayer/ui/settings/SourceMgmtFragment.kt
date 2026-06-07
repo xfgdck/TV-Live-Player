@@ -57,12 +57,11 @@ class SourceMgmtFragment : Fragment() {
     }
 
     private fun showUrlDialog() {
-        val input = EditText(requireActivity())
-        input.hint = "输入 M3U 链接地址"
-        input.setText("https://raw.githubusercontent.com/Supprise0901/TVBox_live/main/live.txt")
+        val view = LayoutInflater.from(requireActivity()).inflate(R.layout.dialog_input_url, null)
+        val input = view.findViewById<EditText>(R.id.et_url)
         AlertDialog.Builder(requireActivity())
             .setTitle("在线链接解析")
-            .setView(input)
+            .setView(view)
             .setPositiveButton("确定") { _, _ ->
                 val url = input.text.toString().trim { it <= ' ' || it == '\uFEFF' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u00A0' }
                 if (url.isNotEmpty()) downloadAndParse(url)
@@ -87,13 +86,13 @@ class SourceMgmtFragment : Fragment() {
     }
 
     private fun showUrlDialogWithUrl(url: String) {
-        val input = EditText(requireActivity())
-        input.hint = "输入 M3U 链接地址"
+        val view = LayoutInflater.from(requireActivity()).inflate(R.layout.dialog_input_url, null)
+        val input = view.findViewById<EditText>(R.id.et_url)
         input.setText(url)
         input.setSelection(url.length)
         AlertDialog.Builder(requireActivity())
             .setTitle("在线链接解析")
-            .setView(input)
+            .setView(view)
             .setPositiveButton("确定") { _, _ ->
                 val text = input.text.toString().trim { it <= ' ' || it == '\uFEFF' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u00A0' }
                 if (text.isNotEmpty()) downloadAndParse(text)
