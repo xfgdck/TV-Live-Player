@@ -161,7 +161,7 @@ button:disabled { opacity: 0.6; }
 </head>
 <body>
 <div class="container">
-<h2>TV-Live-Player</h2>
+<h2>TV Player</h2>
 <div class="tabs">
 <button class="tab active" onclick="switchTab('m3u')">M3U链接</button>
 <button class="tab" onclick="switchTab('channel')">单个频道</button>
