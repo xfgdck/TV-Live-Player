@@ -19,6 +19,7 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.content.pm.PackageManager
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -64,6 +65,10 @@ class PlayerFragment : Fragment() {
     private var lastPlayedUrl: String? = null
     private var redirectingToSourceMgmt = false
     private var userPaused = false
+    private var lastTouchTime = 0L
+    private val isTouchDevice: Boolean by lazy {
+        !requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -239,6 +244,8 @@ class PlayerFragment : Fragment() {
         categoryOverlay.visibility = if (isCategorySelect) View.VISIBLE else View.GONE
 
         if (isCategorySelect) {
+            val maxHeight = (resources.displayMetrics.heightPixels * 0.45).toInt()
+            categoryScroll.layoutParams.height = maxHeight
             categoryTabs.removeAllViews()
             state.allCategories.forEachIndexed { index, cat ->
                 val isSelected = index == state.selectedCategoryIndex
@@ -267,19 +274,29 @@ class PlayerFragment : Fragment() {
             val playingId = state.currentChannel?.id
             state.categoryChannels.forEachIndexed { index, channel ->
                 val isPlaying = channel.id == playingId
-                val isFocused = index == state.selectedChannelIndex
-                val item = TextView(requireContext()).apply {
-                    text = channel.name
-                    textSize = 18f
-                    setPadding(24, 14, 24, 14)
-                    setMinHeight(48)
-                    isFocusable = true
-                    isClickable = true
-                    setOnClickListener { viewModel.confirmCategorySelect() }
-                    setOnFocusChangeListener { _, hasFocus ->
-                        if (hasFocus) viewModel.focusCategoryChannel(index)
-                    }
-                    if (isFocused) {
+                    val isFocused = index == state.selectedChannelIndex
+                    val item = TextView(requireContext()).apply {
+                        text = channel.name
+                        textSize = 18f
+                        setPadding(24, 14, 24, 14)
+                        setMinHeight(48)
+                        isFocusable = true
+                        isClickable = true
+                        setOnClickListener {
+                            if (index == viewModel.state.value.selectedChannelIndex) {
+                                viewModel.confirmCategorySelect()
+                            } else {
+                                viewModel.focusCategoryChannel(index)
+                            }
+                        }
+                        setOnLongClickListener {
+                            showCategoryChannelMenu()
+                            true
+                        }
+                        setOnFocusChangeListener { _, hasFocus ->
+                            if (hasFocus) viewModel.focusCategoryChannel(index)
+                        }
+                        if (isFocused) {
                         setTextColor(resources.getColor(R.color.white, null))
                         setBackgroundResource(R.drawable.channel_item_focused)
                     } else {
@@ -334,39 +351,60 @@ class PlayerFragment : Fragment() {
         val gestureDetector = GestureDetector(requireContext(), object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
-                    enterIconSelect()
+                    lastTouchTime = System.currentTimeMillis()
+                    viewModel.enterCategorySelect()
                 }
                 return true
             }
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
+                    lastTouchTime = System.currentTimeMillis()
+                    togglePlayPause()
+                }
+                return true
+            }
+            override fun onLongPress(e: MotionEvent) {
+                if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
+                    if (viewModel.state.value.channels.isNotEmpty()) {
+                        lastTouchTime = System.currentTimeMillis()
+                        enterIconSelect(focusButton = true)
+                    }
+                }
+            }
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
+                val diffX = e2.x - e1.x
                 val diffY = e2.y - e1.y
-                if (abs(diffY) > 100) {
+                lastTouchTime = System.currentTimeMillis()
+                if (abs(diffX) > abs(diffY) && abs(diffX) > 100) {
+                    val state = viewModel.state.value
+                    if (state.navStack.lastOrNull() == Page.CATEGORY) {
+                        val cur = state.selectedCategoryIndex
+                        val cats = state.allCategories
+                        if (diffX < 0 && cur < cats.size - 1) viewModel.selectCategory(cur + 1)
+                        else if (diffX > 0 && cur > 0) viewModel.selectCategory(cur - 1)
+                    }
+                    return true
+                }
+                if (abs(diffY) > 100 && abs(diffY) > abs(diffX)) {
                     if (diffY < 0) viewModel.nextChannel()
                     else viewModel.previousChannel()
                     return true
                 }
                 return false
             }
-            override fun onDoubleTap(e: MotionEvent): Boolean {
-                enterIconSelect()
-                return true
-            }
-            override fun onLongPress(e: MotionEvent) {
-                if (viewModel.state.value.navStack.lastOrNull() == Page.PLAYER) {
-                    if (viewModel.state.value.channels.isNotEmpty()) {
-                        enterIconSelect()
-                    }
-                }
-            }
         })
-        view?.setOnTouchListener { _, event ->
+        val touchConsumer = View.OnTouchListener { _, event ->
+            if (viewModel.state.value.navStack.lastOrNull() != Page.PLAYER) return@OnTouchListener false
             gestureDetector.onTouchEvent(event)
             true
         }
+        view?.setOnTouchListener(touchConsumer)
+        playerView.setOnTouchListener(touchConsumer)
     }
 
     fun handleKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (System.currentTimeMillis() - lastTouchTime < 500) return false
         val state = viewModel.state.value
         return when (state.navStack.lastOrNull()) {
             Page.ICON -> handleIconKey(keyCode)

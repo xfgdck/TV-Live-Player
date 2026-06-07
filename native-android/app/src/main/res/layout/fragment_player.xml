@@ -166,9 +166,10 @@
         <ScrollView
             android:id="@+id/category_scroll"
             android:layout_width="match_parent"
-            android:layout_height="260dp"
+            android:layout_height="wrap_content"
             android:paddingStart="24dp"
-            android:paddingEnd="24dp">
+            android:paddingEnd="24dp"
+            android:clipToPadding="false">
             <LinearLayout
                 android:id="@+id/category_channel_list"
                 android:layout_width="match_parent"

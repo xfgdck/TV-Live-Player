@@ -7,8 +7,10 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import android.content.pm.PackageManager
 import androidx.lifecycle.lifecycleScope
 import androidx.activity.viewModels
 import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
@@ -27,6 +29,9 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var appPreferences: AppPreferences
 
     val playerViewModel: PlayerViewModel by viewModels()
+    private val isTouchDevice: Boolean by lazy {
+        !packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,6 +50,18 @@ class MainActivity : AppCompatActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, PlayerFragment(), "player")
                 .commit()
+        }
+
+        val btnBack = findViewById<TextView>(R.id.btn_global_back)
+        btnBack.setOnClickListener {
+            onKeyDown(KeyEvent.KEYCODE_BACK, null)
+        }
+
+        lifecycleScope.launch {
+            playerViewModel.state.collect { state ->
+                val hasBack = state.navStack.size > 1 || supportFragmentManager.backStackEntryCount > 0
+                btnBack.visibility = if (isTouchDevice && hasBack) View.VISIBLE else View.GONE
+            }
         }
     }
 

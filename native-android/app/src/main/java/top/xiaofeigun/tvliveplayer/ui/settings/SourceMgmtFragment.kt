@@ -51,6 +51,11 @@ class SourceMgmtFragment : Fragment() {
         view.findViewById<TextView>(R.id.btn_qr_scan).requestFocus()
     }
 
+    private fun closeSelf() {
+        (activity as? MainActivity)?.playerViewModel?.popPage()
+        parentFragmentManager.popBackStack()
+    }
+
     private fun showUrlDialog() {
         val input = EditText(requireActivity())
         input.hint = "输入 M3U 链接地址"
@@ -110,6 +115,7 @@ class SourceMgmtFragment : Fragment() {
                 )
             ))
             Toast.makeText(requireContext(), "频道「${result.name}」添加成功", Toast.LENGTH_SHORT).show()
+            closeSelf()
         }
     }
 
@@ -120,6 +126,7 @@ class SourceMgmtFragment : Fragment() {
                 val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(result.fileContent, null)
                 loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
+                closeSelf()
             } catch (e: Exception) {
                 loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
@@ -165,6 +172,7 @@ class SourceMgmtFragment : Fragment() {
                 val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(body, null)
                 loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
+                closeSelf()
             } catch (e: Exception) {
                 loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
