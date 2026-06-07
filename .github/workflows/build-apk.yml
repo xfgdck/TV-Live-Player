@@ -80,7 +80,7 @@ jobs:
 
       - name: Rename APK files
         run: |
-          for apk in native-android/app/build/outputs/apk/*/*.apk; do
+          for apk in app/build/outputs/apk/*/*.apk; do
             dir=$(dirname "$apk")
             build_type=$(basename "$dir")
             mv "$apk" "$dir/TV-Live-Player-$VERSION_NAME-$build_type.apk"
