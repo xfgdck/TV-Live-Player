@@ -83,7 +83,7 @@ jobs:
           for apk in app/build/outputs/apk/*/*.apk; do
             dir=$(dirname "$apk")
             build_type=$(basename "$dir")
-            mv "$apk" "$dir/TV-Live-Player-$VERSION_NAME-$build_type.apk"
+            mv "$apk" "$dir/TV-Live-Player-$APK_VERSION-$build_type.apk"
           done
 
       - name: Upload APK as artifact
