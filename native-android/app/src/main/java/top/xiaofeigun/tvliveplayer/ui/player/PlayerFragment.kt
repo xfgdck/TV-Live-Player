@@ -306,6 +306,9 @@ class PlayerFragment : Fragment() {
                 }
                 categoryChannelList.addView(item)
             }
+            state.categoryChannels.getOrNull(state.selectedChannelIndex)?.let {
+                categoryChannelList.getChildAt(state.selectedChannelIndex)?.requestFocus()
+            }
             categoryScroll.post {
                 val focused = categoryChannelList.getChildAt(state.selectedChannelIndex) ?: return@post
                 val scrollY = categoryScroll.scrollY

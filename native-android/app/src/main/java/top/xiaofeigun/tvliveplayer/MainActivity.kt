@@ -81,6 +81,26 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isTouchDevice) return super.dispatchKeyEvent(event)
+        val keyCode = event.keyCode
+        if (event.action == KeyEvent.ACTION_DOWN && isDpadKey(keyCode)) {
+            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+            if (currentFragment is PlayerFragment) {
+                if (currentFragment.handleKeyDown(keyCode, event)) return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun isDpadKey(keyCode: Int): Boolean = keyCode in listOf(
+        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+        KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_ALL_APPS,
+        KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE
+    )
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
