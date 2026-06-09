@@ -22,9 +22,9 @@
 
 ### 应用截图
 
-![主界面](screenshot/main-page.png)
-
 ![源管理界面](screenshot/config-page.png)
+
+![主界面](screenshot/main-page.png)
 
 ### 使用方法
 
