@@ -407,7 +407,7 @@ class PlayerFragment : Fragment() {
     }
 
     fun handleKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (System.currentTimeMillis() - lastTouchTime < 500) return false
+        if (isTouchDevice && System.currentTimeMillis() - lastTouchTime < 500) return false
         val state = viewModel.state.value
         return when (state.navStack.lastOrNull()) {
             Page.ICON -> handleIconKey(keyCode)

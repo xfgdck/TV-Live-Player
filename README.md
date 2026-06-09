@@ -2,7 +2,7 @@
 
 # TV-Live-Player
 
-**Android TV 直播播放器，支持 M3U / TXT 直播源，可通过手机扫码配置。**
+**Android TV 电视直播播放器，支持 M3U / TXT 直播源，可通过手机扫码配置。**
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/xfgdck/TV-Live-Player?color=blue&label=最新版本)](https://github.com/xfgdck/TV-Live-Player/releases)
 [![Downloads](https://img.shields.io/github/downloads/xfgdck/TV-Live-Player/total?color=success&label=总下载量)](https://github.com/xfgdck/TV-Live-Player/releases)
