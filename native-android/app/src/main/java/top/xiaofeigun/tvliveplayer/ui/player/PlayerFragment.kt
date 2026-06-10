@@ -62,6 +62,11 @@ class PlayerFragment : Fragment() {
 
     private val exitHandler = Handler(Looper.getMainLooper())
     private var exitConfirmRunnable: Runnable? = null
+
+    private var lastOverlayCategories: List<String> = emptyList()
+    private var lastOverlayCategoryIndex: Int = -1
+    private var lastOverlayChannels: List<Channel> = emptyList()
+    private var lastOverlaySelectedIndex: Int = -1
     private var lastPlayedUrl: String? = null
     private var redirectingToSourceMgmt = false
     private var userPaused = false
@@ -242,10 +247,16 @@ class PlayerFragment : Fragment() {
     private fun updateCategoryOverlay(state: PlayerUiState) {
         val isCategorySelect = state.navStack.lastOrNull() == Page.CATEGORY
         categoryOverlay.visibility = if (isCategorySelect) View.VISIBLE else View.GONE
+        if (!isCategorySelect) return
 
-        if (isCategorySelect) {
-            val maxHeight = (resources.displayMetrics.heightPixels * 0.45).toInt()
-            categoryScroll.layoutParams.height = maxHeight
+        val maxHeight = (resources.displayMetrics.heightPixels * 0.45).toInt()
+        categoryScroll.layoutParams.height = maxHeight
+
+        val needsRebuild = lastOverlayCategories != state.allCategories ||
+                lastOverlayCategoryIndex != state.selectedCategoryIndex ||
+                lastOverlayChannels != state.categoryChannels
+
+        if (needsRebuild) {
             categoryTabs.removeAllViews()
             state.allCategories.forEachIndexed { index, cat ->
                 val isSelected = index == state.selectedCategoryIndex
@@ -271,32 +282,30 @@ class PlayerFragment : Fragment() {
             }
 
             categoryChannelList.removeAllViews()
-            val playingId = state.currentChannel?.id
             state.categoryChannels.forEachIndexed { index, channel ->
-                val isPlaying = channel.id == playingId
-                    val isFocused = index == state.selectedChannelIndex
-                    val item = TextView(requireContext()).apply {
-                        text = channel.name
-                        textSize = 18f
-                        setPadding(24, 14, 24, 14)
-                        setMinHeight(48)
-                        isFocusable = true
-                        isClickable = true
-                        setOnClickListener {
-                            if (index == viewModel.state.value.selectedChannelIndex) {
-                                viewModel.confirmCategorySelect()
-                            } else {
-                                viewModel.focusCategoryChannel(index)
-                            }
+                val isFocused = index == state.selectedChannelIndex
+                val item = TextView(requireContext()).apply {
+                    text = channel.name
+                    textSize = 18f
+                    setPadding(24, 14, 24, 14)
+                    setMinHeight(48)
+                    isFocusable = true
+                    isClickable = true
+                    setOnClickListener {
+                        if (index == viewModel.state.value.selectedChannelIndex) {
+                            viewModel.confirmCategorySelect()
+                        } else {
+                            viewModel.focusCategoryChannel(index)
                         }
-                        setOnLongClickListener {
-                            showCategoryChannelMenu()
-                            true
-                        }
-                        setOnFocusChangeListener { _, hasFocus ->
-                            if (hasFocus) viewModel.focusCategoryChannel(index)
-                        }
-                        if (isFocused) {
+                    }
+                    setOnLongClickListener {
+                        showCategoryChannelMenu()
+                        true
+                    }
+                    setOnFocusChangeListener { _, hasFocus ->
+                        if (hasFocus) viewModel.focusCategoryChannel(index)
+                    }
+                    if (isFocused) {
                         setTextColor(resources.getColor(R.color.white, null))
                         setBackgroundResource(R.drawable.channel_item_focused)
                     } else {
@@ -306,20 +315,37 @@ class PlayerFragment : Fragment() {
                 }
                 categoryChannelList.addView(item)
             }
-            state.categoryChannels.getOrNull(state.selectedChannelIndex)?.let {
-                categoryChannelList.getChildAt(state.selectedChannelIndex)?.requestFocus()
-            }
-            categoryScroll.post {
-                val focused = categoryChannelList.getChildAt(state.selectedChannelIndex) ?: return@post
-                val scrollY = categoryScroll.scrollY
-                val viewHeight = categoryScroll.height
-                if (focused.top < scrollY) {
-                    categoryScroll.smoothScrollTo(0, focused.top)
-                } else if (focused.bottom > scrollY + viewHeight) {
-                    categoryScroll.smoothScrollTo(0, focused.bottom - viewHeight)
+
+            lastOverlayCategories = state.allCategories
+            lastOverlayCategoryIndex = state.selectedCategoryIndex
+            lastOverlayChannels = state.categoryChannels
+            lastOverlaySelectedIndex = state.selectedChannelIndex
+        } else if (lastOverlaySelectedIndex != state.selectedChannelIndex) {
+            val prevIndex = lastOverlaySelectedIndex
+            val newIndex = state.selectedChannelIndex
+            if (prevIndex >= 0) {
+                categoryChannelList.getChildAt(prevIndex)?.let { prevView ->
+                    (prevView as? TextView)?.setTextColor(resources.getColor(R.color.text_secondary, null))
+                    prevView.setBackgroundResource(R.drawable.channel_item_normal)
                 }
-                focused.requestFocus()
             }
+            categoryChannelList.getChildAt(newIndex)?.let { newView ->
+                (newView as? TextView)?.setTextColor(resources.getColor(R.color.white, null))
+                newView.setBackgroundResource(R.drawable.channel_item_focused)
+            }
+            lastOverlaySelectedIndex = state.selectedChannelIndex
+        }
+
+        categoryScroll.post {
+            val focused = categoryChannelList.getChildAt(state.selectedChannelIndex) ?: return@post
+            val scrollY = categoryScroll.scrollY
+            val viewHeight = categoryScroll.height
+            if (focused.top < scrollY) {
+                categoryScroll.scrollTo(0, focused.top)
+            } else if (focused.bottom > scrollY + viewHeight) {
+                categoryScroll.scrollTo(0, focused.bottom - viewHeight)
+            }
+            focused.requestFocus()
         }
     }
 
