@@ -349,14 +349,16 @@ class PlayerViewModel @Inject constructor(
             val channels = repository.getChannelsByCategory(category).first()
             channels.forEach { repository.deleteChannel(it) }
             val updatedCats = repository.getAllCategoriesWithFavorite().first()
-            val newCatIndex = (updatedCats.indexOf(category).coerceAtLeast(0))
-                .let { if (it >= updatedCats.size) updatedCats.size - 1 else it }
-                .coerceAtLeast(0)
+            val oldIndex = _state.value.selectedCategoryIndex
+            val newCatIndex = if (updatedCats.isEmpty()) 0 else oldIndex.coerceAtMost(updatedCats.size - 1)
+            val newCat = updatedCats.getOrNull(newCatIndex)
+            val newChannels = if (newCat != null) repository.getChannelsByCategory(newCat).first() else emptyList()
             _state.update {
                 it.copy(
                     allCategories = updatedCats,
                     selectedCategoryIndex = newCatIndex,
-                    categoryChannels = emptyList()
+                    categoryChannels = newChannels,
+                    selectedChannelIndex = 0
                 )
             }
             refreshAll()
