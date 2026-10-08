@@ -7,7 +7,7 @@ import javax.inject.Singleton
 
 @Singleton
 class AppPreferences @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 

@@ -16,15 +16,11 @@ import top.xiaofeigun.tvliveplayer.R
 import top.xiaofeigun.tvliveplayer.domain.model.Channel
 import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
 import top.xiaofeigun.tvliveplayer.domain.usecase.ParseAndImportM3UUseCase
-import top.xiaofeigun.tvliveplayer.parser.M3UParser
 import top.xiaofeigun.tvliveplayer.util.QrScanResult
 import dagger.hilt.android.AndroidEntryPoint
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
+import okhttp3.OkHttpClient
 import javax.inject.Inject
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
+import javax.inject.Named
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,7 +29,8 @@ import kotlinx.coroutines.withContext
 class SourceMgmtFragment : Fragment() {
 
     @Inject lateinit var channelRepository: ChannelRepository
-    @Inject lateinit var m3uParser: M3UParser
+    @Inject lateinit var parseAndImportM3UUseCase: ParseAndImportM3UUseCase
+    @Inject @Named("unsafeOkHttpClient") lateinit var okHttpClient: OkHttpClient
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -122,7 +119,7 @@ class SourceMgmtFragment : Fragment() {
         val loadingDialog = showLoadingDialog()
         lifecycleScope.launch {
             try {
-                val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(result.fileContent, null)
+                val count = parseAndImportM3UUseCase(result.fileContent, null)
                 loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
                 closeSelf()
@@ -164,11 +161,10 @@ class SourceMgmtFragment : Fragment() {
         val loadingDialog = showLoadingDialog()
         lifecycleScope.launch {
             try {
-                val client = buildUnsafeOkHttpClient()
                 val request = okhttp3.Request.Builder().url(url).build()
-                val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
+                val response = withContext(Dispatchers.IO) { okHttpClient.newCall(request).execute() }
                 val body = response.body?.string() ?: return@launch
-                val count = ParseAndImportM3UUseCase(m3uParser, channelRepository)(body, null)
+                val count = parseAndImportM3UUseCase(body, null)
                 loadingDialog.dismiss()
                 Toast.makeText(requireContext(), "导入成功！共 $count 个频道", Toast.LENGTH_SHORT).show()
                 closeSelf()
@@ -177,23 +173,6 @@ class SourceMgmtFragment : Fragment() {
                 Toast.makeText(requireContext(), "导入失败：${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    private fun buildUnsafeOkHttpClient(): okhttp3.OkHttpClient {
-        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        })
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(null, trustAllCerts, SecureRandom())
-        return okhttp3.OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .hostnameVerifier { _, _ -> true }
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
     }
 
 }

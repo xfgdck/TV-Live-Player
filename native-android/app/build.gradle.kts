@@ -45,13 +45,9 @@ android {
 dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.12.2")
     implementation("androidx.fragment:fragment-ktx:1.8.9")
-
-    // Leanback (Android TV)
-    implementation("androidx.leanback:leanback:1.2.0")
-    implementation("androidx.leanback:leanback-preference:1.2.0")
-    implementation("androidx.tvprovider:tvprovider:1.1.0")
 
     // Media3 ExoPlayer
     implementation("androidx.media3:media3-exoplayer:1.10.0")
@@ -68,7 +64,6 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.59.2")
     ksp("com.google.dagger:hilt-android-compiler:2.59.2")
 
-
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.10.0")
@@ -79,10 +74,6 @@ dependencies {
 
     // JSON
     implementation("com.google.code.gson:gson:2.11.0")
-
-    // Image Loading
-    implementation("io.coil-kt.coil3:coil:3.4.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.4.0")
 
     // QR Code generation
     implementation("com.google.zxing:core:3.5.3")

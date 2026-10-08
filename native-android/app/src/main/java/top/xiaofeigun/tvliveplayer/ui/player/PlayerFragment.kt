@@ -20,6 +20,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -271,10 +272,10 @@ class PlayerFragment : Fragment() {
                         if (hasFocus) viewModel.selectCategory(index)
                     }
                     if (isSelected) {
-                        setTextColor(resources.getColor(R.color.white, null))
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
                         setBackgroundResource(R.drawable.tab_active_bg)
                     } else {
-                        setTextColor(resources.getColor(R.color.text_secondary, null))
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
                         setBackgroundResource(R.drawable.tab_inactive_bg)
                     }
                 }
@@ -306,10 +307,10 @@ class PlayerFragment : Fragment() {
                         if (hasFocus) viewModel.focusCategoryChannel(index)
                     }
                     if (isFocused) {
-                        setTextColor(resources.getColor(R.color.white, null))
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
                         setBackgroundResource(R.drawable.channel_item_focused)
                     } else {
-                        setTextColor(resources.getColor(R.color.text_secondary, null))
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
                         setBackgroundResource(R.drawable.channel_item_normal)
                     }
                 }
@@ -337,12 +338,12 @@ class PlayerFragment : Fragment() {
             val newIndex = state.selectedChannelIndex
             if (prevIndex >= 0) {
                 categoryChannelList.getChildAt(prevIndex)?.let { prevView ->
-                    (prevView as? TextView)?.setTextColor(resources.getColor(R.color.text_secondary, null))
+                    (prevView as? TextView)?.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
                     prevView.setBackgroundResource(R.drawable.channel_item_normal)
                 }
             }
             categoryChannelList.getChildAt(newIndex)?.let { newView ->
-                (newView as? TextView)?.setTextColor(resources.getColor(R.color.white, null))
+                (newView as? TextView)?.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
                 newView.setBackgroundResource(R.drawable.channel_item_focused)
             }
             lastOverlaySelectedIndex = state.selectedChannelIndex
