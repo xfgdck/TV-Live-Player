@@ -4,8 +4,9 @@
 > 本文件是 TV-Live-Player 项目的**唯一最高工程指引、产品设计基准与协作规范**。在阅读需求、生成计划、编写或重构代码前，**务必全文阅读并严格遵守**本文件约定的架构分层、状态机规则、遥控器焦点准则与 Git 提交纪律。
 
 > [!CAUTION]
-> **Git 提交与发布控制原则（极其重要）**：  
-> 任何 AI Agent **严禁擅自执行** `git commit` 或 `git push` 操作！代码修改和本地验证完成后，**必须等待用户明确下达提交指令**（例如：“提交代码”、“推送到 GitHub”、“commit and push”）后，方可执行 Git 提交与远程推送。
+> **Git 提交、发布控制与 CI/CD 跟踪闭环原则（极其重要）**：  
+> 1. 任何 AI Agent **严禁擅自执行** `git commit` 或 `git push` 操作！代码修改和本地验证完成后，**必须等待用户明确下达提交指令**（例如：“提交代码”、“推送到 GitHub”、“commit and push”）后，方可执行 Git 提交与远程推送。
+> 2. **提交后闭环跟踪**：推送到 GitHub 后，**必须主动跟踪 GitHub Actions 构建状态**（通过 GitHub API 查询执行结果）。若构建失败，必须立即分析 CI 日志、修复问题并重新提交推送，直到 GitHub Actions 构建完全成功并完成 Release 发布。
 
 ---
 
@@ -260,3 +261,6 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
    - 修改后必须实际执行 `./gradlew assembleDebug --no-daemon` 验证编译无误，严禁提交无法编译的代码。
 6. [ ] **是否获得用户明确的 Git 提交授权？**
    - **严禁私自提交或推送**。未获得用户显式下达的提交指令（例如：“提交代码”、“推送到 GitHub”、“commit and push”）前，保持工作区状态，不得调用 `git commit` 或 `git push`。
+7. [ ] **推送后是否主动跟踪 GitHub Actions 直至成功？**
+   - 提交推送后，必须主动查询 GitHub API 检查 Actions 运行状态。
+   - 若 Actions 失败，必须定位报错原因、继续修改并再次提交流程，直至 GitHub Actions 构建完全成功并完成 Release 发布。
