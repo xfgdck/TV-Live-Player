@@ -1,0 +1,34 @@
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android APK/AAB
+*.apk
+*.aab
+
+# Generated
+/captures/
+.externalNativeBuild/
+.cxx/
+*.log
+
+# Keystore
+*.keystore
+*.jks
+key.properties
+
+# Uploads (AI workspace temp files)
+.uploads/
