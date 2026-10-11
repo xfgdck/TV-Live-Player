@@ -119,6 +119,11 @@ class PlayerFragment : Fragment() {
         playerView.player = tvPlayer.player
         setupTouch()
 
+        listOf(btnIconSettings, btnIconSource, btnIconFavorite).forEach { btn ->
+            btn.isFocusable = true
+            btn.isFocusableInTouchMode = true
+        }
+
         btnIconSettings.setOnClickListener { onIconAction(0) }
         btnIconSource.setOnClickListener { onIconAction(1) }
         btnIconFavorite.setOnClickListener { onIconAction(2) }
@@ -404,11 +409,16 @@ class PlayerFragment : Fragment() {
 
     private fun updateIconPanel(state: PlayerUiState) {
         val shouldShow = state.navStack.lastOrNull() == Page.ICON
-        if (shouldShow && iconPanel.visibility != View.VISIBLE) {
-            iconPanel.visibility = View.VISIBLE
-            iconPanel.alpha = 1.0f
-            iconSelectedIndex = -1
-        } else if (!shouldShow && iconPanel.visibility == View.VISIBLE) {
+        if (shouldShow) {
+            if (iconPanel.visibility != View.VISIBLE) {
+                iconPanel.visibility = View.VISIBLE
+                iconPanel.alpha = 1.0f
+                if (iconSelectedIndex < 0) {
+                    iconSelectedIndex = 0
+                }
+                focusIconItem(iconSelectedIndex)
+            }
+        } else if (iconPanel.visibility == View.VISIBLE) {
             iconPanel.visibility = View.GONE
             iconSelectedIndex = -1
         }
@@ -500,7 +510,7 @@ class PlayerFragment : Fragment() {
         val state = viewModel.state.value
         if (state.channels.isEmpty()) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_ALL_APPS) {
-                enterIconSelect()
+                enterIconSelect(focusButton = true)
                 return true
             }
             return false
@@ -558,7 +568,7 @@ class PlayerFragment : Fragment() {
         iconPanel.alpha = 1.0f
         if (focusButton) {
             iconSelectedIndex = 0
-            btnIconSettings.requestFocus()
+            focusIconItem(0)
         } else {
             iconSelectedIndex = -1
         }
@@ -575,8 +585,8 @@ class PlayerFragment : Fragment() {
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (iconSelectedIndex < 0) {
                     iconSelectedIndex = 0
-                    focusIconItem(0)
                 }
+                focusIconItem(iconSelectedIndex)
                 true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -586,17 +596,21 @@ class PlayerFragment : Fragment() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
-                if (iconSelectedIndex >= 0) {
-                    iconSelectedIndex = (iconSelectedIndex - 1 + 3) % 3
-                    focusIconItem(iconSelectedIndex)
+                iconSelectedIndex = if (iconSelectedIndex >= 0) {
+                    (iconSelectedIndex - 1 + 3) % 3
+                } else {
+                    0
                 }
+                focusIconItem(iconSelectedIndex)
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (iconSelectedIndex >= 0) {
-                    iconSelectedIndex = (iconSelectedIndex + 1) % 3
-                    focusIconItem(iconSelectedIndex)
+                iconSelectedIndex = if (iconSelectedIndex >= 0) {
+                    (iconSelectedIndex + 1) % 3
+                } else {
+                    0
                 }
+                focusIconItem(iconSelectedIndex)
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
@@ -619,10 +633,16 @@ class PlayerFragment : Fragment() {
     }
 
     private fun focusIconItem(index: Int) {
-        when (index) {
-            0 -> btnIconSettings.requestFocus()
-            1 -> btnIconSource.requestFocus()
-            2 -> btnIconFavorite.requestFocus()
+        val targetView = when (index) {
+            0 -> btnIconSettings
+            1 -> btnIconSource
+            2 -> btnIconFavorite
+            else -> btnIconSettings
+        }
+        targetView.isFocusable = true
+        targetView.isFocusableInTouchMode = true
+        targetView.post {
+            targetView.requestFocus()
         }
     }
 
@@ -802,6 +822,10 @@ class PlayerFragment : Fragment() {
         super.onResume()
         if (!userPaused && viewModel.state.value.navStack.lastOrNull() != Page.ICON) {
             tvPlayer.resume()
+        }
+        if (viewModel.state.value.navStack.lastOrNull() == Page.ICON) {
+            if (iconSelectedIndex < 0) iconSelectedIndex = 0
+            focusIconItem(iconSelectedIndex)
         }
     }
 

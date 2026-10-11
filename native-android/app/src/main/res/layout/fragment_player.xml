@@ -126,6 +126,7 @@
             android:scaleType="centerInside"
             android:padding="10dp"
             android:focusable="true"
+            android:focusableInTouchMode="true"
             android:clickable="true" />
         <ImageButton
             android:id="@+id/btn_icon_source"
@@ -137,6 +138,7 @@
             android:scaleType="centerInside"
             android:padding="10dp"
             android:focusable="true"
+            android:focusableInTouchMode="true"
             android:clickable="true" />
         <ImageButton
             android:id="@+id/btn_icon_favorite"
@@ -148,6 +150,7 @@
             android:scaleType="centerInside"
             android:padding="10dp"
             android:focusable="true"
+            android:focusableInTouchMode="true"
             android:clickable="true" />
     </LinearLayout>
 
