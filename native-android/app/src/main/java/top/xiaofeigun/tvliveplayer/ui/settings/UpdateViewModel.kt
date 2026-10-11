@@ -67,10 +67,14 @@ class UpdateViewModel @Inject constructor(
                 if (info.hasUpdate) {
                     val destinationDir = context.getExternalFilesDir("downloads") ?: context.cacheDir
                     val destinationFile = File(destinationDir, info.apkName ?: "TV-Live-Player-latest.apk")
-                    if (destinationFile.exists() && (info.apkSize <= 0 || destinationFile.length() == info.apkSize)) {
+                    if (destinationFile.exists() && destinationFile.length() > 0 &&
+                        (info.apkSize <= 0 || destinationFile.length() == info.apkSize)) {
                         downloadedApkFile = destinationFile
                         _uiState.value = UpdateUiState.ReadyToInstall(info, destinationFile, autoLaunch = false)
                     } else {
+                        if (destinationFile.exists() && destinationFile.length() == 0L) {
+                            destinationFile.delete()
+                        }
                         _uiState.value = UpdateUiState.HasUpdate(info)
                     }
                 } else {
@@ -83,26 +87,6 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun startDownload(context: Context, updateInfo: UpdateInfo) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!context.packageManager.canRequestPackageInstalls()) {
-                try {
-                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(settingsIntent)
-                    android.widget.Toast.makeText(
-                        context,
-                        "请在设置中开启「允许安装未知应用」权限，开启后返回即可继续更新",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                    return
-                } catch (_: Exception) {
-                    // Fallback to continuing download if settings intent not supported
-                }
-            }
-        }
-
         val downloadUrl = updateInfo.apkDownloadUrl
         if (downloadUrl.isNullOrBlank()) {
             _uiState.value = UpdateUiState.Error("未找到可下载的 APK 安装包", updateInfo)
@@ -172,7 +156,7 @@ class UpdateViewModel @Inject constructor(
                         context.startActivity(settingsIntent)
                         android.widget.Toast.makeText(
                             context,
-                            "请在设置中开启「允许安装未知应用」权限，开启后返回即可安装",
+                            "请在设置中开启「允许安装未知应用」权限后返回安装",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                         return
@@ -191,8 +175,8 @@ class UpdateViewModel @Inject constructor(
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
             }
 
             val resList = context.packageManager.queryIntentActivities(

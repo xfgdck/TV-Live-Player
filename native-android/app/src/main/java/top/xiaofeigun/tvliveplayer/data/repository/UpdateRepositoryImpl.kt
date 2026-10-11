@@ -30,6 +30,16 @@ class UpdateRepositoryImpl @Inject constructor(
     companion object {
         private const val GITHUB_LATEST_RELEASE_URL =
             "https://api.github.com/repos/xfgdck/TV-Live-Player/releases/latest"
+        private const val GH_MIRROR_PREFIX = "https://ghproxy.net/"
+    }
+
+    private val downloadHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
     }
 
     override suspend fun checkUpdate(currentVersionName: String): Result<UpdateInfo> = withContext(Dispatchers.IO) {
@@ -92,70 +102,91 @@ class UpdateRepositoryImpl @Inject constructor(
         emit(DownloadState.Downloading(0L, 0L, 0))
 
         val tempFile = File(destinationFile.parentFile, "${destinationFile.name}.tmp")
-        try {
-            destinationFile.parentFile?.mkdirs()
-            if (tempFile.exists()) tempFile.delete()
+        destinationFile.parentFile?.mkdirs()
+        if (tempFile.exists()) tempFile.delete()
 
-            val request = Request.Builder()
-                .url(downloadUrl)
-                .header("User-Agent", "TV-Live-Player")
-                .build()
+        // 尝试直连下载，若因网络原因失败则尝试镜像加速
+        val urlsToTry = if (downloadUrl.startsWith("https://github.com/") && !downloadUrl.startsWith(GH_MIRROR_PREFIX)) {
+            listOf(downloadUrl, "$GH_MIRROR_PREFIX$downloadUrl")
+        } else {
+            listOf(downloadUrl)
+        }
 
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                emit(DownloadState.Error("下载失败 (HTTP ${response.code})"))
-                return@flow
-            }
+        var downloadSuccess = false
+        var lastError: Exception? = null
 
-            val responseBody = response.body
-            if (responseBody == null) {
-                emit(DownloadState.Error("下载响应内容为空"))
-                return@flow
-            }
+        for (targetUrl in urlsToTry) {
+            try {
+                if (tempFile.exists()) tempFile.delete()
+                val request = Request.Builder()
+                    .url(targetUrl)
+                    .header("User-Agent", "TV-Live-Player")
+                    .build()
 
-            val totalBytes = responseBody.contentLength()
-            var bytesDownloaded = 0L
-            var lastEmittedPercent = -1
-            var lastEmittedTime = 0L
-
-            responseBody.byteStream().use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    val buffer = ByteArray(8192)
-                    var read: Int
-                    while (input.read(buffer).also { read = it } != -1) {
-                        output.write(buffer, 0, read)
-                        bytesDownloaded += read
-
-                        val percent = if (totalBytes > 0) {
-                            ((bytesDownloaded * 100) / totalBytes).toInt()
-                        } else {
-                            -1
-                        }
-
-                        val now = System.currentTimeMillis()
-                        if (percent != lastEmittedPercent || now - lastEmittedTime > 250) {
-                            lastEmittedPercent = percent
-                            lastEmittedTime = now
-                            emit(DownloadState.Downloading(bytesDownloaded, totalBytes, percent))
-                        }
-                    }
-                    output.flush()
+                val response = downloadHttpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    lastError = IOException("下载响应异常 (HTTP ${response.code})")
+                    continue
                 }
-            }
 
-            // Rename tempFile to destinationFile
+                val responseBody = response.body
+                if (responseBody == null) {
+                    lastError = IOException("下载响应内容为空")
+                    continue
+                }
+
+                val totalBytes = responseBody.contentLength()
+                var bytesDownloaded = 0L
+                var lastEmittedPercent = -1
+                var lastEmittedTime = 0L
+
+                responseBody.byteStream().use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        val buffer = ByteArray(8192)
+                        var read: Int
+                        while (input.read(buffer).also { read = it } != -1) {
+                            output.write(buffer, 0, read)
+                            bytesDownloaded += read
+
+                            val percent = if (totalBytes > 0) {
+                                ((bytesDownloaded * 100) / totalBytes).toInt()
+                            } else {
+                                -1
+                            }
+
+                            val now = System.currentTimeMillis()
+                            if (percent != lastEmittedPercent || now - lastEmittedTime > 250) {
+                                lastEmittedPercent = percent
+                                lastEmittedTime = now
+                                emit(DownloadState.Downloading(bytesDownloaded, totalBytes, percent))
+                            }
+                        }
+                        output.flush()
+                    }
+                }
+
+                if (tempFile.exists() && tempFile.length() > 0) {
+                    downloadSuccess = true
+                    break
+                }
+            } catch (e: CancellationException) {
+                if (tempFile.exists()) tempFile.delete()
+                throw e
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+
+        if (downloadSuccess && tempFile.exists()) {
             if (destinationFile.exists()) destinationFile.delete()
             if (tempFile.renameTo(destinationFile)) {
                 emit(DownloadState.Success(destinationFile))
             } else {
-                emit(DownloadState.Error("文件重命名失败"))
+                emit(DownloadState.Error("安装包重命名就绪失败"))
             }
-        } catch (e: CancellationException) {
+        } else {
             if (tempFile.exists()) tempFile.delete()
-            throw e
-        } catch (e: Exception) {
-            if (tempFile.exists()) tempFile.delete()
-            emit(DownloadState.Error(e.localizedMessage ?: "下载出错"))
+            emit(DownloadState.Error(lastError?.localizedMessage ?: "下载失败，请检查网络"))
         }
     }.flowOn(Dispatchers.IO)
 }

@@ -161,7 +161,7 @@ class UpdateFragment : Fragment() {
 
             is UpdateUiState.ReadyToInstall -> {
                 val info = state.updateInfo
-                tvUpdateStatus.text = if (state.autoLaunch) "安装包下载完成，正在启动安装..." else if (info.isNewer) "安装包已就绪，点击立即安装" else "安装包已就绪（提示：若签名不同或降级需先卸载旧版）"
+                tvUpdateStatus.text = if (state.autoLaunch) "安装包下载完成，正在启动安装..." else "安装包已就绪，覆盖更新将保留全部频道与配置"
                 progressChecking.visibility = View.GONE
                 layoutUpdateDetails.visibility = View.VISIBLE
                 tvLatestVersion.text = if (info.isNewer) "新版本：${info.releaseTitle}" else "远程版本：${info.releaseTitle}"

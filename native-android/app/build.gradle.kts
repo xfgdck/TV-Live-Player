@@ -28,9 +28,30 @@ android {
         versionName = appVersionName
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFileProp = project.findProperty("android.injected.signing.store.file")?.toString()
+            if (storeFileProp != null && file(storeFileProp).exists()) {
+                storeFile = file(storeFileProp)
+                storePassword = project.findProperty("android.injected.signing.store.password")?.toString()
+                keyAlias = project.findProperty("android.injected.signing.key.alias")?.toString()
+                keyPassword = project.findProperty("android.injected.signing.key.password")?.toString()
+            } else {
+                val debugKeystore = signingConfigs.getByName("debug").storeFile
+                if (debugKeystore != null && debugKeystore.exists()) {
+                    storeFile = debugKeystore
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

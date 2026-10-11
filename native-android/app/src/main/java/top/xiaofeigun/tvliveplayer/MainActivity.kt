@@ -18,7 +18,9 @@ import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
 import top.xiaofeigun.tvliveplayer.ui.player.Page
 import top.xiaofeigun.tvliveplayer.ui.player.PlayerFragment
 import top.xiaofeigun.tvliveplayer.ui.player.PlayerViewModel
+import top.xiaofeigun.tvliveplayer.util.ChannelBackupHelper
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var channelRepository: ChannelRepository
     @Inject lateinit var appPreferences: AppPreferences
+    @Inject lateinit var channelBackupHelper: ChannelBackupHelper
 
     val playerViewModel: PlayerViewModel by viewModels()
     private val isTouchDevice: Boolean by lazy {
@@ -39,10 +42,20 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hideSystemBars()
 
-        if (appPreferences.isFirstLaunch()) {
-            lifecycleScope.launch {
+        lifecycleScope.launch {
+            if (appPreferences.isFirstLaunch()) {
                 channelRepository.resetToDefaults()
                 appPreferences.setFirstLaunchDone()
+                channelBackupHelper.saveBackup(channelRepository.exportData())
+            } else {
+                // 非首次启动（如应用覆盖更新后），检查数据库自愈恢复
+                val channels = channelRepository.getAllChannels().first()
+                if (channels.isEmpty()) {
+                    val backup = channelBackupHelper.loadBackup()
+                    if (!backup.isNullOrBlank()) {
+                        channelRepository.importData(backup)
+                    }
+                }
             }
         }
 
@@ -50,6 +63,8 @@ class MainActivity : AppCompatActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, PlayerFragment(), "player")
                 .commit()
+
+            handleIntent(intent)
         }
 
         val btnBack = findViewById<TextView>(R.id.btn_global_back)
@@ -90,6 +105,20 @@ class MainActivity : AppCompatActivity() {
             .add(R.id.fragment_container, fragment, "update")
             .addToBackStack("update")
             .commit()
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: android.content.Intent?) {
+        when (intent?.getStringExtra("page") ?: intent?.getStringExtra("open_page")) {
+            "update" -> showUpdate()
+            "settings" -> showSettings()
+            "source_mgmt" -> showSourceMgmt()
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -150,6 +179,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        lifecycleScope.launch {
+            try {
+                val data = channelRepository.exportData()
+                channelBackupHelper.saveBackup(data)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun hideSystemBars() {
