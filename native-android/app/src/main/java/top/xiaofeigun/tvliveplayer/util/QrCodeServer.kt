@@ -42,46 +42,69 @@ class QrCodeServer(private val port: Int = 0) {
         try {
             while (!socket.isClosed) {
                 val client = socket.accept()
-                val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.UTF_8))
-                val requestLine = reader.readLine() ?: continue
+                val rawInput = client.getInputStream()
+                val headerBytes = java.io.ByteArrayOutputStream()
+                var b: Int
+                var prev = -1
+                var prevPrev = -1
+                var prevPrevPrev = -1
+                while (rawInput.read().also { b = it } != -1) {
+                    headerBytes.write(b)
+                    if (b == '\n'.code && prev == '\r'.code && prevPrev == '\n'.code && prevPrevPrev == '\r'.code) {
+                        break
+                    }
+                    if (b == '\n'.code && prev == '\n'.code) {
+                        break
+                    }
+                    prevPrevPrev = prevPrev
+                    prevPrev = prev
+                    prev = b
+                }
+                val headerStr = headerBytes.toString(Charsets.US_ASCII.name())
+                val lines = headerStr.lines()
+                val requestLine = lines.firstOrNull() ?: continue
                 val parts = requestLine.split(" ")
                 val method = parts.getOrElse(0) { "" }
                 val path = parts.getOrElse(1) { "" }
 
                 var contentLength = 0
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    val header = line!!
-                    if (header.isBlank()) break
-                    if (header.startsWith("Content-Length:", ignoreCase = true))
-                        contentLength = header.substringAfter(":").trim().toIntOrNull() ?: 0
+                for (hdr in lines) {
+                    if (hdr.startsWith("Content-Length:", ignoreCase = true)) {
+                        contentLength = hdr.substringAfter(":").trim().toIntOrNull() ?: 0
+                    }
                 }
 
                 if (method == "POST" && path == "/submit") {
                     val body = if (contentLength > 0) {
-                        val chars = CharArray(contentLength)
-                        val totalRead = reader.read(chars)
-                        if (totalRead <= 0) "" else String(chars, 0, totalRead)
+                        val bodyBytes = ByteArray(contentLength)
+                        var readTotal = 0
+                        while (readTotal < contentLength) {
+                            val count = rawInput.read(bodyBytes, readTotal, contentLength - readTotal)
+                            if (count == -1) break
+                            readTotal += count
+                        }
+                        String(bodyBytes, 0, readTotal, Charsets.UTF_8)
                     } else {
                         ""
                     }
-                    val out = OutputStreamWriter(client.getOutputStream())
+                    val out = OutputStreamWriter(client.getOutputStream(), Charsets.UTF_8)
                     val result = parseJson(body)
                     if (result != null) {
-                        out.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n\u63d0\u4ea4\u6210\u529f\uff0c\u53ef\u4ee5\u5173\u95ed\u6b64\u9875\u9762")
+                        out.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n提交成功，可以关闭此页面")
                         out.flush()
                         client.close()
                         stop()
                         return@withContext result
                     } else {
-                        out.write("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n\u6570\u636e\u683c\u5f0f\u65e0\u6548")
+                        out.write("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n数据格式无效")
                         out.flush()
                         client.close()
                     }
                 } else {
                     val html = HTML_PAGE
-                    val out = OutputStreamWriter(client.getOutputStream())
-                    out.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${html.toByteArray().size}\r\nConnection: close\r\n\r\n$html")
+                    val bytes = html.toByteArray(Charsets.UTF_8)
+                    val out = OutputStreamWriter(client.getOutputStream(), Charsets.UTF_8)
+                    out.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n$html")
                     out.flush()
                     client.close()
                 }

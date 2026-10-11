@@ -71,7 +71,10 @@ class SourceMgmtFragment : Fragment() {
         val dialog = QrInputDialogFragment()
         dialog.setOnResultReceived { result ->
             when (result.type) {
-                "m3u_url" -> showUrlDialogWithUrl(result.url)
+                "m3u_url" -> {
+                    val cleanUrl = result.url.trim { it <= ' ' || it == '\uFEFF' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u00A0' }
+                    if (cleanUrl.isNotEmpty()) downloadAndParse(cleanUrl)
+                }
                 "channel" -> addChannelFromQr(result)
                 "file" -> parseM3uFromQr(result)
             }
@@ -138,7 +141,6 @@ class SourceMgmtFragment : Fragment() {
                 lifecycleScope.launch {
                     channelRepository.clearAllChannels()
                     Toast.makeText(requireContext(), "节目单已清空，请添加新的直播源", Toast.LENGTH_SHORT).show()
-                    (activity as? MainActivity)?.playerViewModel?.resetToPlayer()
                 }
             }
             .setNegativeButton("取消", null)

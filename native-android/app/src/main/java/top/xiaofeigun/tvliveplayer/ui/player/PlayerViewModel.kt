@@ -274,7 +274,9 @@ class PlayerViewModel @Inject constructor(
                     stack.add(page)
                 }
             } else {
-                stack.add(page)
+                if (stack.lastOrNull() != page) {
+                    stack.add(page)
+                }
             }
             s.copy(navStack = ensureSingleLevel1Path(stack))
         }

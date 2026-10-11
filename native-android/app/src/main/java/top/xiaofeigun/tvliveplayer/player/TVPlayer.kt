@@ -78,7 +78,7 @@ class TVPlayer @Inject constructor(private val context: Context) {
                         val nextIdx = urlIndex + 1
                         if (nextIdx < urlList.size) {
                             urlIndex = nextIdx
-                            val nextUrl = urlList[nextIdx]
+                            _playbackState.value = PlaybackState.BUFFERING
                             _errorMessage.value = "正在切换源(${nextIdx + 1}/${urlList.size})..."
                             retryHandler?.postDelayed({
                                 playCurrent()
@@ -98,8 +98,10 @@ class TVPlayer @Inject constructor(private val context: Context) {
         retryHandler?.removeCallbacksAndMessages(null)
         if (urls.isEmpty()) {
             _playbackState.value = PlaybackState.IDLE
+            _errorMessage.value = null
             return
         }
+        _playbackState.value = PlaybackState.BUFFERING
         playCurrent()
     }
 

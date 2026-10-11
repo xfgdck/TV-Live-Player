@@ -12,6 +12,7 @@ import androidx.media3.ui.PlayerView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -44,6 +45,7 @@ class PlayerFragment : Fragment() {
     private val viewModel: PlayerViewModel by viewModels(ownerProducer = { requireActivity() })
 
     private lateinit var playerView: PlayerView
+    private lateinit var osdLayout: View
     private lateinit var tvChannelName: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var ivPause: ImageView
@@ -55,6 +57,7 @@ class PlayerFragment : Fragment() {
     private lateinit var categoryOverlay: View
     private lateinit var categoryScroll: ScrollView
     private lateinit var categoryChannelList: LinearLayout
+    private lateinit var categoryTabsScroll: HorizontalScrollView
     private lateinit var categoryTabs: LinearLayout
     private lateinit var iconPanel: View
     private lateinit var btnIconSettings: ImageButton
@@ -63,11 +66,18 @@ class PlayerFragment : Fragment() {
 
     private val exitHandler = Handler(Looper.getMainLooper())
     private var exitConfirmRunnable: Runnable? = null
+    private val osdHandler = Handler(Looper.getMainLooper())
+    private val hideOsdRunnable = Runnable {
+        if (::osdLayout.isInitialized) {
+            osdLayout.visibility = View.GONE
+        }
+    }
 
     private var lastOverlayCategories: List<String> = emptyList()
     private var lastOverlayCategoryIndex: Int = -1
     private var lastOverlayChannels: List<Channel> = emptyList()
     private var lastOverlaySelectedIndex: Int = -1
+    private var lastPlayedChannelId: String? = null
     private var lastPlayedUrl: String? = null
     private var redirectingToSourceMgmt = false
     private var userPaused = false
@@ -86,6 +96,7 @@ class PlayerFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         playerView = view.findViewById(R.id.player_view)
+        osdLayout = view.findViewById(R.id.osd_layout)
         tvChannelName = view.findViewById(R.id.tv_channel_name)
         progressBar = view.findViewById(R.id.progress_bar)
         ivPause = view.findViewById(R.id.iv_pause)
@@ -97,6 +108,7 @@ class PlayerFragment : Fragment() {
         categoryOverlay = view.findViewById(R.id.category_overlay)
         categoryScroll = view.findViewById(R.id.category_scroll)
         categoryChannelList = view.findViewById(R.id.category_channel_list)
+        categoryTabsScroll = view.findViewById(R.id.category_tabs_scroll)
         categoryTabs = view.findViewById(R.id.category_tabs)
         iconPanel = view.findViewById(R.id.icon_panel)
         btnIconSettings = view.findViewById(R.id.btn_icon_settings)
@@ -143,15 +155,21 @@ class PlayerFragment : Fragment() {
                     val channel = state.currentChannel
                     if (channel != null) {
                         val playUrl = channel.url
-                        if (playUrl != lastPlayedUrl) {
+                        if (channel.id != lastPlayedChannelId || playUrl != lastPlayedUrl) {
+                            lastPlayedChannelId = channel.id
                             lastPlayedUrl = playUrl
+                            userPaused = false
                             tvError.visibility = View.GONE
                             ivPause.visibility = View.GONE
+                            showOsd()
                             tvPlayer.playUrls(channel.allUrls)
                         }
-                    } else if (lastPlayedUrl != null) {
+                    } else if (lastPlayedChannelId != null || lastPlayedUrl != null) {
+                        lastPlayedChannelId = null
                         lastPlayedUrl = null
+                        userPaused = false
                         ivPause.visibility = View.GONE
+                        osdLayout.visibility = View.GONE
                         tvPlayer.release()
                         tvPlayer.initialize()
                         playerView.player = tvPlayer.player
@@ -173,7 +191,13 @@ class PlayerFragment : Fragment() {
                     PlaybackState.BUFFERING -> {
                         progressBar.visibility = View.VISIBLE
                         ivPause.visibility = View.GONE
-                        tvError.visibility = View.GONE
+                        val errMsg = tvPlayer.errorMessage.value
+                        if (errMsg != null && errMsg.startsWith("正在切换源")) {
+                            tvError.text = errMsg
+                            tvError.visibility = View.VISIBLE
+                        } else {
+                            tvError.visibility = View.GONE
+                        }
                         tvWelcome.visibility = View.GONE
                         tvEmptyGuide.visibility = View.GONE
                     }
@@ -211,13 +235,23 @@ class PlayerFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             tvPlayer.errorMessage.collect { msg ->
                 if (msg != null) {
-                    tvError.text = "播放失败: $msg"
+                    tvError.text = if (msg.startsWith("正在切换源")) msg else "播放失败: $msg"
+                    if (tvPlayer.playbackState.value == PlaybackState.BUFFERING && msg.startsWith("正在切换源")) {
+                        tvError.visibility = View.VISIBLE
+                    }
                 } else {
                     tvError.text = resources.getString(R.string.error_tip)
                 }
             }
         }
 
+    }
+
+    private fun showOsd() {
+        if (!::osdLayout.isInitialized) return
+        osdHandler.removeCallbacks(hideOsdRunnable)
+        osdLayout.visibility = View.VISIBLE
+        osdHandler.postDelayed(hideOsdRunnable, 3000L)
     }
 
     private fun updateChannelInfo(state: PlayerUiState) {
@@ -321,6 +355,12 @@ class PlayerFragment : Fragment() {
             lastOverlayCategoryIndex = state.selectedCategoryIndex
             lastOverlayChannels = state.categoryChannels
             lastOverlaySelectedIndex = state.selectedChannelIndex
+
+            categoryTabsScroll.post {
+                val selectedTab = categoryTabs.getChildAt(state.selectedCategoryIndex) ?: return@post
+                val scrollX = selectedTab.left - (categoryTabsScroll.width - selectedTab.width) / 2
+                categoryTabsScroll.smoothScrollTo(scrollX.coerceAtLeast(0), 0)
+            }
 
             categoryScroll.post {
                 val focused = categoryChannelList.getChildAt(state.selectedChannelIndex) ?: return@post
@@ -752,10 +792,16 @@ class PlayerFragment : Fragment() {
         }
     }
 
+    override fun onDestroyView() {
+        osdHandler.removeCallbacksAndMessages(null)
+        super.onDestroyView()
+    }
+
     override fun onDestroy() {
         playerView.player = null
         super.onDestroy()
         tvPlayer.release()
         exitHandler.removeCallbacksAndMessages(null)
+        osdHandler.removeCallbacksAndMessages(null)
     }
 }

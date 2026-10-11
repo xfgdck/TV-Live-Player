@@ -46,20 +46,28 @@ class M3UParser @Inject constructor() {
                 val logo = extractQuotedValue(line, "tvg-logo")
                 val category = extractQuotedValue(line, "group-title") ?: sourceCategory ?: "未分类"
                 val name = line.substringAfterLast(",").trim()
-                if (i + 1 < lines.size) {
-                    i++
-                    val url = lines[i].trim()
-                    if (url.isNotEmpty() && !url.startsWith("#")) {
-                        channels.add(Channel(
-                            id = UUID.randomUUID().toString(),
-                            name = name.ifEmpty { "未知频道" },
-                            url = url,
-                            category = category,
-                            logo = logo?.ifEmpty { null },
-                            tvgId = tvgId?.ifEmpty { null },
-                            sortOrder = channels.size
-                        ))
+                var url = ""
+                while (i + 1 < lines.size) {
+                    val nextLine = lines[i + 1].trim()
+                    if (nextLine.startsWith("#EXTINF:")) {
+                        break
                     }
+                    i++
+                    if (nextLine.isNotEmpty() && !nextLine.startsWith("#")) {
+                        url = nextLine
+                        break
+                    }
+                }
+                if (url.isNotEmpty()) {
+                    channels.add(Channel(
+                        id = UUID.randomUUID().toString(),
+                        name = name.ifEmpty { "未知频道" },
+                        url = url,
+                        category = category,
+                        logo = logo?.ifEmpty { null },
+                        tvgId = tvgId?.ifEmpty { null },
+                        sortOrder = channels.size
+                    ))
                 }
             }
             i++

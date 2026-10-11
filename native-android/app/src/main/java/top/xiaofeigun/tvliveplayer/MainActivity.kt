@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showSettings() {
+        playerViewModel.pushPage(Page.SETTINGS)
         val fragment = top.xiaofeigun.tvliveplayer.ui.settings.SettingsFragment()
         supportFragmentManager.beginTransaction()
             .add(R.id.fragment_container, fragment, "settings")
@@ -74,10 +75,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showSourceMgmt() {
+        playerViewModel.pushPage(Page.SOURCE_MGMT)
         val fragment = top.xiaofeigun.tvliveplayer.ui.settings.SourceMgmtFragment()
         supportFragmentManager.beginTransaction()
             .add(R.id.fragment_container, fragment, "source_mgmt")
             .addToBackStack("source_mgmt")
+            .commit()
+    }
+
+    fun showUpdate() {
+        playerViewModel.pushPage(Page.UPDATE)
+        val fragment = top.xiaofeigun.tvliveplayer.ui.settings.UpdateFragment()
+        supportFragmentManager.beginTransaction()
+            .add(R.id.fragment_container, fragment, "update")
+            .addToBackStack("update")
             .commit()
     }
 

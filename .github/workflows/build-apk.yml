@@ -60,7 +60,7 @@ jobs:
       - name: Grant execute permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Build APK
+      - name: Build Release APK
         run: |
           VERSION_CODE=$(date +%Y%m%d)
           VERSION_NAME=$(date +%Y.%m.%d)
@@ -74,23 +74,22 @@ jobs:
               -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
           else
-            ./gradlew assembleDebug --no-daemon $GRADLE_OPTS
+            ./gradlew assembleRelease --no-daemon $GRADLE_OPTS
           fi
           echo "APK_VERSION=$VERSION_NAME" >> $GITHUB_ENV
 
-      - name: Rename APK files
+      - name: Rename Release APK
         run: |
-          for apk in app/build/outputs/apk/*/*.apk; do
+          for apk in app/build/outputs/apk/release/*.apk; do
             dir=$(dirname "$apk")
-            build_type=$(basename "$dir")
-            mv "$apk" "$dir/TV-Live-Player-$APK_VERSION-$build_type.apk"
+            mv "$apk" "$dir/TV-Live-Player-$APK_VERSION-release.apk"
           done
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v6
         with:
-          name: TV-Live-Player-${{ env.APK_VERSION }}
-          path: native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
+          name: TV-Live-Player-${{ env.APK_VERSION }}-release
+          path: native-android/app/build/outputs/apk/release/TV-Live-Player-*-release.apk
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -106,7 +105,7 @@ jobs:
             - 提交: ${{ github.sha }}
             - 分支: ${{ github.ref_name }}
           files: |
-            native-android/app/build/outputs/apk/*/TV-Live-Player-*.apk
+            native-android/app/build/outputs/apk/release/TV-Live-Player-*-release.apk
           draft: false
           prerelease: false
           make_latest: true

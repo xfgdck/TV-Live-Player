@@ -185,8 +185,10 @@
             android:background="#334A90D9" />
 
         <HorizontalScrollView
+            android:id="@+id/category_tabs_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:scrollbars="none"
             android:paddingStart="24dp"
             android:paddingEnd="24dp">
             <LinearLayout

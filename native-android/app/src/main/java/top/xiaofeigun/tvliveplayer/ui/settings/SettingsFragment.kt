@@ -23,10 +23,7 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         view.findViewById<TextView>(R.id.btn_update).setOnClickListener {
-            parentFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, UpdateFragment())
-                .addToBackStack("update")
-                .commit()
+            (activity as? top.xiaofeigun.tvliveplayer.MainActivity)?.showUpdate()
         }
 
         view.findViewById<TextView>(R.id.btn_update).requestFocus()

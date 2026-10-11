@@ -7,6 +7,7 @@
 > **Git 提交、发布控制与 CI/CD 跟踪闭环原则（极其重要）**：  
 > 1. 任何 AI Agent **严禁擅自执行** `git commit` 或 `git push` 操作！代码修改和本地验证完成后，**必须等待用户明确下达提交指令**（例如：“提交代码”、“推送到 GitHub”、“commit and push”）后，方可执行 Git 提交与远程推送。
 > 2. **提交后闭环跟踪**：推送到 GitHub 后，**必须主动跟踪 GitHub Actions 构建状态**（通过 GitHub API 查询执行结果）。若构建失败，必须立即分析 CI 日志、修复问题并重新提交推送，直到 GitHub Actions 构建完全成功并完成 Release 发布。
+> 3. **Debug 测试直播源规范**：在本地开发、功能自测或模拟器联调等 Debug 测试阶段，**统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源**，严禁使用非标准或未经验证的测试源。
 
 ---
 
@@ -240,6 +241,10 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 - 触发路径：`native-android/**`、`.github/workflows/build-apk.yml`
 - 自动化行为：构建 Release/Debug APK，自动创建带有日期版本标签（如 `v2026.10.08`）的 GitHub Release 并挂载 APK 文件。
 
+### 8.5 Debug 版本专用测试直播源
+- **测试直播源 URL**：`https://peterhchina.github.io/iptv/CNTV-V4.m3u`
+- **使用要求**：在本地开发、功能调试、自动化测试或模拟器联调等 Debug 阶段，AI Agent **必须统一使用此直播源** 进行在线 M3U 解析导入、同名聚合、备用源轮换及流媒体播放测试，确保各 AI Agent 调试基准一致。
+
 ---
 
 ## 9. AI Agent 协作准则与自检清单
@@ -264,3 +269,5 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 7. [ ] **推送后是否主动跟踪 GitHub Actions 直至成功？**
    - 提交推送后，必须主动查询 GitHub API 检查 Actions 运行状态。
    - 若 Actions 失败，必须定位报错原因、继续修改并再次提交流程，直至 GitHub Actions 构建完全成功并完成 Release 发布。
+8. [ ] **Debug 测试是否使用指定直播源？**
+   - 本地模拟器联调与测试验证时，统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源进行 M3U 导入与流媒体播放功能验证。
