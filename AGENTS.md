@@ -241,7 +241,7 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 - 配置文件：`.github/workflows/build-apk.yml`
 - 触发分支：`main`、`master`
 - 触发路径：`native-android/**`、`.github/workflows/build-apk.yml`
-- 自动化行为：构建 Release/Debug APK，自动创建带有日期版本标签（如 `v2026.10.08`）的 GitHub Release 并挂载 APK 文件。
+- 自动化行为：构建 Release/Debug APK，自动创建带有分时版本标签（如 `v2026.10.11.1816`）的 GitHub Release 并挂载 APK 文件。
 
 ### 8.5 Debug 版本专用测试直播源
 - **测试直播源 URL**：`https://peterhchina.github.io/iptv/CNTV-V4.m3u`

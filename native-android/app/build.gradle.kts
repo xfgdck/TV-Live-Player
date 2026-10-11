@@ -10,8 +10,8 @@ import java.util.Locale
 import java.util.TimeZone
 
 val beijingTz: TimeZone = TimeZone.getTimeZone("GMT+8")
-val defaultDateVersionName: String = SimpleDateFormat("yyyy.MM.dd", Locale.CHINA).apply { timeZone = beijingTz }.format(Date())
-val defaultDateVersionCode: Int = SimpleDateFormat("yyyyMMdd", Locale.CHINA).apply { timeZone = beijingTz }.format(Date()).toInt()
+val defaultDateVersionName: String = SimpleDateFormat("yyyy.MM.dd.HHmm", Locale.CHINA).apply { timeZone = beijingTz }.format(Date())
+val defaultDateVersionCode: Int = (System.currentTimeMillis() / 1000).toInt()
 
 val appVersionCode: Int = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: defaultDateVersionCode
 val appVersionName: String = project.findProperty("versionName")?.toString() ?: defaultDateVersionName

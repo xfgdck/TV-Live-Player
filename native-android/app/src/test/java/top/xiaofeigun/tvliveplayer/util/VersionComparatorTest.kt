@@ -59,8 +59,8 @@ class VersionComparatorTest {
     @Test
     fun testAppConfigDateFormat() {
         val version = AppConfig.currentVersionName
-        // Format should be YYYY.MM.DD
-        assertTrue("Version name should match date format: $version", version.matches(Regex("""^\d{4}\.\d{2}\.\d{2}$""")))
+        // Format should be YYYY.MM.DD.HHmm (or YYYY.MM.DD)
+        assertTrue("Version name should match date format: $version", version.matches(Regex("""^\d{4}\.\d{2}\.\d{2}(\.\d{4})?$""")))
         assertTrue("Version code should be positive: ${AppConfig.currentVersionCode}", AppConfig.currentVersionCode > 20260000)
     }
 }

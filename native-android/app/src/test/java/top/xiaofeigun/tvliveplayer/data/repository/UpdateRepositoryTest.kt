@@ -50,5 +50,14 @@ class UpdateRepositoryTest {
         // Version comparison check
         assertTrue(VersionComparator.isNewer("1.0.0", dto.tagName ?: ""))
         assertFalse(VersionComparator.isNewer("2026.10.11", dto.tagName ?: ""))
+
+        // Tests with hour and minute
+        assertTrue(VersionComparator.isNewer("2026.10.11", "v2026.10.11.1816"))
+        assertTrue(VersionComparator.isNewer("2026.10.11.1800", "v2026.10.11.1816"))
+        assertFalse(VersionComparator.isNewer("2026.10.11.1816", "v2026.10.11.1816"))
+        assertFalse(VersionComparator.isNewer("2026.10.11.1820", "v2026.10.11.1816"))
+        assertTrue(VersionComparator.isNewer("2026.10.11.1816", "v2026.10.12.0900"))
+        assertTrue(VersionComparator.hasUpdate("2026.10.11.1816", "v2026.10.11.1820"))
+        assertFalse(VersionComparator.hasUpdate("2026.10.11.1816", "v2026.10.11.1816"))
     }
 }

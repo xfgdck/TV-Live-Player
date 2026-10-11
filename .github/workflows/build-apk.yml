@@ -62,8 +62,8 @@ jobs:
 
       - name: Build Release APK
         run: |
-          VERSION_CODE=$(TZ='Asia/Shanghai' date +%Y%m%d)
-          VERSION_NAME=$(TZ='Asia/Shanghai' date +%Y.%m.%d)
+          VERSION_CODE=$(date +%s)
+          VERSION_NAME=$(TZ='Asia/Shanghai' date +%Y.%m.%d.%H%M)
           GRADLE_OPTS="-PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME"
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
