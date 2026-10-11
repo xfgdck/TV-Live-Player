@@ -4,6 +4,18 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
+val beijingTz: TimeZone = TimeZone.getTimeZone("GMT+8")
+val defaultDateVersionName: String = SimpleDateFormat("yyyy.MM.dd", Locale.CHINA).apply { timeZone = beijingTz }.format(Date())
+val defaultDateVersionCode: Int = SimpleDateFormat("yyyyMMdd", Locale.CHINA).apply { timeZone = beijingTz }.format(Date()).toInt()
+
+val appVersionCode: Int = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: defaultDateVersionCode
+val appVersionName: String = project.findProperty("versionName")?.toString() ?: defaultDateVersionName
+
 android {
     namespace = "top.xiaofeigun.tvliveplayer"
     compileSdk = 36
@@ -12,8 +24,8 @@ android {
         applicationId = "top.xiaofeigun.tvliveplayer"
         minSdk = 23
         targetSdk = 36
-        versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
-        versionName = project.findProperty("versionName")?.toString() ?: "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildTypes {
@@ -83,6 +95,7 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 
     // Desugaring (Java 8+ API for older Android)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

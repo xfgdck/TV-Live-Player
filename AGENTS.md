@@ -8,6 +8,7 @@
 > 1. 任何 AI Agent **严禁擅自执行** `git commit` 或 `git push` 操作！代码修改和本地验证完成后，**必须等待用户明确下达提交指令**（例如：“提交代码”、“推送到 GitHub”、“commit and push”）后，方可执行 Git 提交与远程推送。
 > 2. **提交后闭环跟踪**：推送到 GitHub 后，**必须主动跟踪 GitHub Actions 构建状态**（通过 GitHub API 查询执行结果）。若构建失败，必须立即分析 CI 日志、修复问题并重新提交推送，直到 GitHub Actions 构建完全成功并完成 Release 发布。
 > 3. **Debug 测试直播源规范**：在本地开发、功能自测或模拟器联调等 Debug 测试阶段，**统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源**，严禁使用非标准或未经验证的测试源。
+> 4. **编译自动安装与禁止模拟器测试纪律**：AI Agent 本地验证**只需执行 JVM 单元测试**（`./gradlew testDebugUnitTest`）与 APK 编译；编译完成后**直接通过 ADB 自动安装至模拟器并启动应用**（无需输出 APK 本地路径），**严禁自行在模拟器中进行交互测试**。在回复中主动提供测试订阅源链接，后续由用户亲自在模拟器中手动测试。
 
 ---
 
@@ -264,8 +265,8 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 4. [ ] **代码是否有冗余或未使用的资源？**
    - 新增资源必须有明确调用点，废弃代码需彻底清理，不在代码库遗留死代码和无用布局。
 5. [ ] **构建与测试验证规范（极其重要）**：
-   - **统一采用 JVM 单元测试作为首选高速验证**：本地逻辑验证必须优先执行 `./gradlew testDebugUnitTest --no-daemon`（涵盖 M3U/TXT 解析、归一化去重、多源聚合、分类合并等），几秒内完成极速全量验证，严禁依赖缓慢的逐步 ADB 交互调试。
-   - **单测通过后必须自动安装到模拟器并提供测试订阅源**：单测验证通过后，必须编译并将最新 APK 安装到 MuMu 模拟器（`adb install -r ...` 并启动应用），并在回复中**主动提供测试订阅源链接**（`https://peterhchina.github.io/iptv/CNTV-V4.m3u`），方便用户亲自在模拟器中手动把玩与验收。
+   - **仅需执行 JVM 单元测试作为首选高速验证**：本地逻辑验证只需执行 `./gradlew testDebugUnitTest --no-daemon`（涵盖 M3U/TXT 解析、归一化去重、多源聚合、分类内切台、更新版本比较与发布 DTO 解析等），几秒内完成极速全量验证。
+   - **编译后直接安装到模拟器，交由用户测试**：单测通过并编译生成 APK 后，**必须通过 ADB 自动将 APK 安装至模拟器并拉起应用**（`adb connect ...; adb install -r ...; adb shell am start ...`），**严禁 AI Agent 自行进入模拟器进行交互测试**。安装完成后在回复中**主动提供测试订阅源链接**（`https://peterhchina.github.io/iptv/CNTV-V4.m3u`），接下来由用户手动体验与测试。
 6. [ ] **是否获得用户明确的 Git 提交授权？**
    - **严禁私自提交或推送**。未获得用户显式下达的提交指令（例如：“提交代码”、“推送到 GitHub”、“commit and push”）前，保持工作区状态，不得调用 `git commit` 或 `git push`。
 7. [ ] **推送后是否主动跟踪 GitHub Actions 直至成功？**

@@ -15,6 +15,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+import top.xiaofeigun.tvliveplayer.data.repository.UpdateRepositoryImpl
+import top.xiaofeigun.tvliveplayer.domain.repository.UpdateRepository
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
@@ -45,6 +48,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideChannelRepository(repository: ChannelRepositoryImpl): ChannelRepository = repository
+
+    @Provides
+    @Singleton
+    fun provideUpdateRepository(repository: UpdateRepositoryImpl): UpdateRepository = repository
 
     @Provides
     @Singleton

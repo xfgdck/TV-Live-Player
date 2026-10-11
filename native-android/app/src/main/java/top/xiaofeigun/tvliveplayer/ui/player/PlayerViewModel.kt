@@ -27,6 +27,7 @@ data class PlayerUiState(
     val channels: List<Channel> = emptyList(),
     val allCategories: List<String> = emptyList(),
     val currentChannel: Channel? = null,
+    val currentCategory: String = "",
     val currentIndex: Int = 0,
     val isFavorite: Boolean = false,
     val navStack: List<Page> = listOf(Page.PLAYER),
@@ -70,12 +71,14 @@ class PlayerViewModel @Inject constructor(
                     }
                     val idx = if (targetChannel != null) list.indexOf(targetChannel) else 0
                     val isFav = if (targetChannel != null) repository.isFavorite(targetChannel.id) else false
+                    val initialCategory = targetChannel?.category ?: cats.firstOrNull() ?: ""
 
                     _state.update {
                         it.copy(
                             channels = list,
                             allCategories = cats,
                             currentChannel = targetChannel,
+                            currentCategory = initialCategory,
                             currentIndex = idx,
                             isFavorite = isFav,
                             channelsLoaded = true
@@ -94,6 +97,7 @@ class PlayerViewModel @Inject constructor(
                                 channels = list,
                                 allCategories = cats,
                                 currentChannel = null,
+                                currentCategory = "",
                                 currentIndex = 0,
                                 isFavorite = false
                             )
@@ -107,6 +111,7 @@ class PlayerViewModel @Inject constructor(
                                 channels = list,
                                 allCategories = cats,
                                 currentChannel = newChannel,
+                                currentCategory = newChannel.category,
                                 currentIndex = newIdx,
                                 isFavorite = newIsFav,
                                 channelsLoaded = true
@@ -119,6 +124,7 @@ class PlayerViewModel @Inject constructor(
                             it.copy(
                                 channels = list,
                                 allCategories = cats,
+                                currentCategory = it.currentCategory.ifBlank { it.currentChannel?.category ?: "" },
                                 isFavorite = isFav
                             )
                         }
@@ -132,18 +138,24 @@ class PlayerViewModel @Inject constructor(
         appPreferences.setLastChannelId(channel.id)
     }
 
-    fun playChannel(channel: Channel) {
-        val idx = _state.value.channels.indexOfFirst { it.id == channel.id }
-        if (idx >= 0) {
-            _state.update {
-                it.copy(
-                    currentChannel = channel,
-                    currentIndex = idx,
-                    isFavorite = channel.isFavorite
-                )
+    fun playChannel(channel: Channel, category: String? = null) {
+        val targetCat = category ?: run {
+            val cur = _state.value.currentCategory
+            if (cur == ChannelRepository.FAVORITE_CATEGORY && channel.isFavorite) {
+                ChannelRepository.FAVORITE_CATEGORY
+            } else {
+                channel.category
             }
-        } else {
-            _state.update { it.copy(currentChannel = channel, isFavorite = channel.isFavorite) }
+        }
+        val idx = _state.value.channels.indexOfFirst { it.id == channel.id }
+        _state.update {
+            it.copy(
+                currentChannel = channel,
+                currentCategory = targetCat,
+                currentIndex = if (idx >= 0) idx else 0,
+                isFavorite = channel.isFavorite,
+                videoPaused = false
+            )
         }
         saveLastChannel(channel)
     }
@@ -152,15 +164,18 @@ class PlayerViewModel @Inject constructor(
         val s = _state.value
         val list = s.channels
         if (list.isEmpty()) return
-        val newIdx = (s.currentIndex + 1) % list.size
+        val curIdx = list.indexOfFirst { it.id == s.currentChannel?.id }.let { if (it >= 0) it else s.currentIndex }
+        val newIdx = (curIdx + 1) % list.size
         val ch = list[newIdx]
         viewModelScope.launch {
             val isFav = repository.isFavorite(ch.id)
             _state.update {
                 it.copy(
                     currentChannel = ch,
+                    currentCategory = ch.category,
                     currentIndex = newIdx,
-                    isFavorite = isFav
+                    isFavorite = isFav,
+                    videoPaused = false
                 )
             }
             saveLastChannel(ch)
@@ -171,15 +186,18 @@ class PlayerViewModel @Inject constructor(
         val s = _state.value
         val list = s.channels
         if (list.isEmpty()) return
-        val newIdx = (s.currentIndex - 1 + list.size) % list.size
+        val curIdx = list.indexOfFirst { it.id == s.currentChannel?.id }.let { if (it >= 0) it else s.currentIndex }
+        val newIdx = (curIdx - 1 + list.size) % list.size
         val ch = list[newIdx]
         viewModelScope.launch {
             val isFav = repository.isFavorite(ch.id)
             _state.update {
                 it.copy(
                     currentChannel = ch,
+                    currentCategory = ch.category,
                     currentIndex = newIdx,
-                    isFavorite = isFav
+                    isFavorite = isFav,
+                    videoPaused = false
                 )
             }
             saveLastChannel(ch)
@@ -209,10 +227,12 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun confirmCategorySelect() {
-        val chs = _state.value.categoryChannels
-        val idx = _state.value.selectedChannelIndex
-        if (chs.isNotEmpty() && idx < chs.size) {
-            playChannel(chs[idx])
+        val s = _state.value
+        val chs = s.categoryChannels
+        val idx = s.selectedChannelIndex
+        val cat = s.allCategories.getOrNull(s.selectedCategoryIndex)
+        if (chs.isNotEmpty() && idx in chs.indices) {
+            playChannel(chs[idx], category = cat)
         }
         _state.update { it.copy(navStack = ensureSingleLevel1Path(listOf(Page.PLAYER))) }
     }
@@ -233,10 +253,11 @@ class PlayerViewModel @Inject constructor(
 
     fun enterCategorySelect() {
         val s = _state.value
-        val curCat = s.currentChannel?.category ?: s.allCategories.firstOrNull() ?: return
-        val catIdx = s.allCategories.indexOf(curCat).coerceAtLeast(0)
+        val curCat = s.currentCategory.ifBlank { s.currentChannel?.category } ?: s.allCategories.firstOrNull() ?: return
+        val catIdx = s.allCategories.indexOf(curCat).let { if (it >= 0) it else 0 }
+        val targetCat = s.allCategories.getOrNull(catIdx) ?: curCat
         viewModelScope.launch {
-            val channels = repository.getChannelsByCategory(curCat).first()
+            val channels = repository.getChannelsByCategory(targetCat).first()
             val chIdx = channels.indexOfFirst { it.id == s.currentChannel?.id }.coerceAtLeast(0)
             _state.update {
                 val cur = it.navStack

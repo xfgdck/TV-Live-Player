@@ -6,25 +6,27 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AppPreferences @Inject constructor(
-    @param:ApplicationContext private val context: Context
+open class AppPreferences @Inject constructor(
+    @param:ApplicationContext private val context: Context?
 ) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-    fun getLastChannelId(): String? {
-        return prefs.getString(KEY_LAST_CHANNEL_ID, null)
+    private val prefs by lazy {
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    fun setLastChannelId(id: String) {
-        prefs.edit().putString(KEY_LAST_CHANNEL_ID, id).apply()
+    open fun getLastChannelId(): String? {
+        return prefs?.getString(KEY_LAST_CHANNEL_ID, null)
     }
 
-    fun isFirstLaunch(): Boolean {
-        return prefs.getBoolean(KEY_FIRST_LAUNCH, true)
+    open fun setLastChannelId(id: String) {
+        prefs?.edit()?.putString(KEY_LAST_CHANNEL_ID, id)?.apply()
     }
 
-    fun setFirstLaunchDone() {
-        prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply()
+    open fun isFirstLaunch(): Boolean {
+        return prefs?.getBoolean(KEY_FIRST_LAUNCH, true) ?: true
+    }
+
+    open fun setFirstLaunchDone() {
+        prefs?.edit()?.putBoolean(KEY_FIRST_LAUNCH, false)?.apply()
     }
 
     companion object {

@@ -34,3 +34,8 @@
 -dontwarn kotlinx.coroutines.**
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+
+# Models & DTOs
+-keep class top.xiaofeigun.tvliveplayer.data.remote.model.** { *; }
+-keep class top.xiaofeigun.tvliveplayer.domain.model.** { *; }
+
