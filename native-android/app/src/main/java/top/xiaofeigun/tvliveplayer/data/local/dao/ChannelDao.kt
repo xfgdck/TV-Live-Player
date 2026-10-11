@@ -27,11 +27,20 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE id = :id")
     suspend fun getChannelById(id: String): ChannelEntity?
 
+    @Query("SELECT * FROM channels ORDER BY sortOrder ASC")
+    suspend fun getAllChannelsList(): List<ChannelEntity>
+
+    @Query("SELECT MAX(sortOrder) FROM channels")
+    suspend fun getMaxSortOrder(): Int?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(channels: List<ChannelEntity>)
 
     @Update
     suspend fun update(channel: ChannelEntity)
+
+    @Update
+    suspend fun updateAll(channels: List<ChannelEntity>)
 
     @Delete
     suspend fun delete(channel: ChannelEntity)

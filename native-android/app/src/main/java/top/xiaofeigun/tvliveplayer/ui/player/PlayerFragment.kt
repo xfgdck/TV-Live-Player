@@ -649,6 +649,19 @@ class PlayerFragment : Fragment() {
         }
     }
 
+    private var edgeToast: Toast? = null
+    private var lastEdgeToastTime = 0L
+
+    private fun showEdgeTip(message: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastEdgeToastTime < 2000L) {
+            return
+        }
+        lastEdgeToastTime = now
+        edgeToast?.cancel()
+        edgeToast = Toast.makeText(context, message, Toast.LENGTH_SHORT).apply { show() }
+    }
+
     private fun handleCategoryKey(keyCode: Int): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -656,7 +669,7 @@ class PlayerFragment : Fragment() {
                 if (cur > 0) {
                     viewModel.selectCategory(cur - 1)
                 } else {
-                    Toast.makeText(context, "已是第一个分类", Toast.LENGTH_SHORT).show()
+                    showEdgeTip("已是第一个分类")
                 }
                 true
             }
@@ -666,7 +679,7 @@ class PlayerFragment : Fragment() {
                 if (cur < cats.size - 1) {
                     viewModel.selectCategory(cur + 1)
                 } else {
-                    Toast.makeText(context, "已是最后一个分类", Toast.LENGTH_SHORT).show()
+                    showEdgeTip("已是最后一个分类")
                 }
                 true
             }
@@ -675,7 +688,7 @@ class PlayerFragment : Fragment() {
                 if (cur > 0) {
                     viewModel.focusCategoryChannel(cur - 1)
                 } else {
-                    Toast.makeText(context, "已是第一个频道", Toast.LENGTH_SHORT).show()
+                    showEdgeTip("已是第一个频道")
                 }
                 true
             }
@@ -685,7 +698,7 @@ class PlayerFragment : Fragment() {
                 if (cur < chs.size - 1) {
                     viewModel.focusCategoryChannel(cur + 1)
                 } else {
-                    Toast.makeText(context, "已是最后一个频道", Toast.LENGTH_SHORT).show()
+                    showEdgeTip("已是最后一个频道")
                 }
                 true
             }

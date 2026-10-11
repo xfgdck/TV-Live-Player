@@ -81,6 +81,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+
     // Desugaring (Java 8+ API for older Android)
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

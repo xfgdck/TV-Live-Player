@@ -6,10 +6,10 @@ import top.xiaofeigun.tvliveplayer.data.local.dao.ChannelDao
 import top.xiaofeigun.tvliveplayer.data.local.dao.SourceDao
 import top.xiaofeigun.tvliveplayer.data.local.entity.ChannelEntity
 import top.xiaofeigun.tvliveplayer.data.local.entity.SourceEntity
-import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
 import top.xiaofeigun.tvliveplayer.domain.model.Channel
 import top.xiaofeigun.tvliveplayer.domain.model.Source
 import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
+import top.xiaofeigun.tvliveplayer.parser.M3UParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -20,7 +20,6 @@ import javax.inject.Singleton
 class ChannelRepositoryImpl @Inject constructor(
     private val channelDao: ChannelDao,
     private val sourceDao: SourceDao,
-    private val appPreferences: AppPreferences,
     private val gson: Gson
 ) : ChannelRepository {
 
@@ -67,8 +66,63 @@ class ChannelRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addChannels(channels: List<Channel>) {
-        val entities = channels.map { ChannelEntity.fromDomainModel(it) }
-        channelDao.insertAll(entities)
+        if (channels.isEmpty()) return
+        val existingEntities = channelDao.getAllChannelsList()
+        val existingMap = existingEntities.associateBy { M3UParser.normalizeKey(it.name) }.toMutableMap()
+        var nextSortOrder = (channelDao.getMaxSortOrder() ?: -1) + 1
+
+        val toInsert = mutableListOf<ChannelEntity>()
+        val toUpdate = mutableMapOf<String, ChannelEntity>()
+
+        for (newCh in channels) {
+            val key = M3UParser.normalizeKey(newCh.name)
+            val existing = existingMap[key]
+            if (existing != null) {
+                // Channel already exists: merge backup URLs and enrich metadata without duplicating channels
+                val existingBackup = if (existing.backupUrls.isBlank()) emptyList() else existing.backupUrls.split("|||")
+                val existingAllUrls = listOf(existing.url) + existingBackup
+                val newAllUrls = listOf(newCh.url) + newCh.backupUrls
+
+                // Combine keeping existing primary URL first, appending new unique backup URLs
+                val mergedUrls = (existingAllUrls + newAllUrls)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+
+                val updatedEntity = existing.copy(
+                    url = mergedUrls.firstOrNull() ?: existing.url,
+                    backupUrls = mergedUrls.drop(1).joinToString("|||"),
+                    logo = existing.logo?.ifBlank { null } ?: newCh.logo?.ifBlank { null },
+                    tvgId = existing.tvgId?.ifBlank { null } ?: newCh.tvgId?.ifBlank { null },
+                    category = if (existing.category == "未分类" && newCh.category != "未分类") newCh.category else existing.category
+                    // favorite and sortOrder are preserved
+                )
+                existingMap[key] = updatedEntity
+                toUpdate[updatedEntity.id] = updatedEntity
+            } else {
+                // Brand new channel
+                val newEntity = ChannelEntity(
+                    id = newCh.id,
+                    name = newCh.name,
+                    url = newCh.url,
+                    backupUrls = newCh.backupUrls.filter { it.isNotBlank() }.distinct().joinToString("|||"),
+                    category = newCh.category,
+                    logo = newCh.logo?.ifBlank { null },
+                    tvgId = newCh.tvgId?.ifBlank { null },
+                    sortOrder = nextSortOrder++,
+                    favorite = if (newCh.isFavorite) 1 else 0
+                )
+                existingMap[key] = newEntity
+                toInsert.add(newEntity)
+            }
+        }
+
+        if (toUpdate.isNotEmpty()) {
+            channelDao.updateAll(toUpdate.values.toList())
+        }
+        if (toInsert.isNotEmpty()) {
+            channelDao.insertAll(toInsert)
+        }
     }
 
     override suspend fun updateChannel(channel: Channel) {

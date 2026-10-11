@@ -167,6 +167,7 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
   - **取消收藏**：从收藏中移除该频道。
 - **其他自定义分类下**：
   - **移动到其它分类**：弹出分类列表，将该频道归属更改为目标分类。
+  - **合并当前分类**：将当前分类下的全部频道批量移入指定分类，当前分类自动合并消除。
   - **删除当前频道**：从数据库中永久移除当前频道。
   - **清空当前分类**：弹出二次确认对话框，确认后删除该分类下全部频道。
 
@@ -262,12 +263,13 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
    - UI 变化通过 `PlayerViewModel` 的 `_state.update { ... }` 驱动，Fragment 仅负责收集和渲染。
 4. [ ] **代码是否有冗余或未使用的资源？**
    - 新增资源必须有明确调用点，废弃代码需彻底清理，不在代码库遗留死代码和无用布局。
-5. [ ] **构建验证是否通过？**
-   - 修改后必须实际执行 `./gradlew assembleDebug --no-daemon` 验证编译无误，严禁提交无法编译的代码。
+5. [ ] **构建与测试验证规范（极其重要）**：
+   - **统一采用 JVM 单元测试作为首选高速验证**：本地逻辑验证必须优先执行 `./gradlew testDebugUnitTest --no-daemon`（涵盖 M3U/TXT 解析、归一化去重、多源聚合、分类合并等），几秒内完成极速全量验证，严禁依赖缓慢的逐步 ADB 交互调试。
+   - **单测通过后必须自动安装到模拟器并提供测试订阅源**：单测验证通过后，必须编译并将最新 APK 安装到 MuMu 模拟器（`adb install -r ...` 并启动应用），并在回复中**主动提供测试订阅源链接**（`https://peterhchina.github.io/iptv/CNTV-V4.m3u`），方便用户亲自在模拟器中手动把玩与验收。
 6. [ ] **是否获得用户明确的 Git 提交授权？**
    - **严禁私自提交或推送**。未获得用户显式下达的提交指令（例如：“提交代码”、“推送到 GitHub”、“commit and push”）前，保持工作区状态，不得调用 `git commit` 或 `git push`。
 7. [ ] **推送后是否主动跟踪 GitHub Actions 直至成功？**
    - 提交推送后，必须主动查询 GitHub API 检查 Actions 运行状态。
    - 若 Actions 失败，必须定位报错原因、继续修改并再次提交流程，直至 GitHub Actions 构建完全成功并完成 Release 发布。
-8. [ ] **Debug 测试是否使用指定直播源？**
-   - 本地模拟器联调与测试验证时，统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源进行 M3U 导入与流媒体播放功能验证。
+8. [ ] **Debug 测试直播源标准**：
+   - 测试验证统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源。
