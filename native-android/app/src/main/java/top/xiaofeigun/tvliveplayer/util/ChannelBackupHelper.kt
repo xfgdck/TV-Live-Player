@@ -50,8 +50,4 @@ class ChannelBackupHelper @Inject constructor(
             null
         }
     }
-
-    fun hasBackup(): Boolean {
-        return backupFile.exists() && backupFile.length() > 0
-    }
 }

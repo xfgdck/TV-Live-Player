@@ -1,11 +1,12 @@
 package top.xiaofeigun.tvliveplayer.util
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.OutputStreamWriter
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
+import java.net.Socket
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,79 +40,95 @@ class QrCodeServer(private val port: Int = 0) {
 
     suspend fun waitForUrl(): QrScanResult? = withContext(Dispatchers.IO) {
         val socket = serverSocket ?: return@withContext null
-        try {
-            while (!socket.isClosed) {
-                val client = socket.accept()
-                val rawInput = client.getInputStream()
-                val headerBytes = java.io.ByteArrayOutputStream()
-                var b: Int
-                var prev = -1
-                var prevPrev = -1
-                var prevPrevPrev = -1
-                while (rawInput.read().also { b = it } != -1) {
-                    headerBytes.write(b)
-                    if (b == '\n'.code && prev == '\r'.code && prevPrev == '\n'.code && prevPrevPrev == '\r'.code) {
-                        break
-                    }
-                    if (b == '\n'.code && prev == '\n'.code) {
-                        break
-                    }
-                    prevPrevPrev = prevPrev
-                    prevPrev = prev
-                    prev = b
-                }
-                val headerStr = headerBytes.toString(Charsets.US_ASCII.name())
-                val lines = headerStr.lines()
-                val requestLine = lines.firstOrNull() ?: continue
-                val parts = requestLine.split(" ")
-                val method = parts.getOrElse(0) { "" }
-                val path = parts.getOrElse(1) { "" }
-
-                var contentLength = 0
-                for (hdr in lines) {
-                    if (hdr.startsWith("Content-Length:", ignoreCase = true)) {
-                        contentLength = hdr.substringAfter(":").trim().toIntOrNull() ?: 0
-                    }
-                }
-
-                if (method == "POST" && path == "/submit") {
-                    val body = if (contentLength > 0) {
-                        val bodyBytes = ByteArray(contentLength)
-                        var readTotal = 0
-                        while (readTotal < contentLength) {
-                            val count = rawInput.read(bodyBytes, readTotal, contentLength - readTotal)
-                            if (count == -1) break
-                            readTotal += count
-                        }
-                        String(bodyBytes, 0, readTotal, Charsets.UTF_8)
-                    } else {
-                        ""
-                    }
-                    val out = OutputStreamWriter(client.getOutputStream(), Charsets.UTF_8)
-                    val result = parseJson(body)
-                    if (result != null) {
-                        out.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n提交成功，可以关闭此页面")
-                        out.flush()
-                        client.close()
-                        stop()
-                        return@withContext result
-                    } else {
-                        out.write("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n数据格式无效")
-                        out.flush()
-                        client.close()
-                    }
-                } else {
-                    val html = HTML_PAGE
-                    val bytes = html.toByteArray(Charsets.UTF_8)
-                    val out = OutputStreamWriter(client.getOutputStream(), Charsets.UTF_8)
-                    out.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n$html")
-                    out.flush()
-                    client.close()
-                }
+        while (!socket.isClosed) {
+            val client = try {
+                socket.accept()
+            } catch (_: Exception) {
+                break // 服务已关闭
             }
-        } catch (_: Exception) {}
+            // 单个异常连接（预连接空 socket、超大请求、半途断开）只丢弃该连接，不影响后续请求
+            val result = try {
+                client.soTimeout = CLIENT_TIMEOUT_MS
+                handleClient(client)
+            } catch (_: Exception) {
+                null
+            } finally {
+                try { client.close() } catch (_: Exception) {}
+            }
+            if (result != null) {
+                stop()
+                return@withContext result
+            }
+        }
         return@withContext null
     }
+
+    private fun handleClient(client: Socket): QrScanResult? {
+        val rawInput = client.getInputStream()
+        val headerStr = readHeader(rawInput) ?: return null
+        val lines = headerStr.lines()
+        val parts = lines.firstOrNull()?.split(" ") ?: return null
+        val method = parts.getOrElse(0) { "" }
+        val path = parts.getOrElse(1) { "" }
+
+        var contentLength = 0
+        for (hdr in lines) {
+            if (hdr.startsWith("Content-Length:", ignoreCase = true)) {
+                contentLength = hdr.substringAfter(":").trim().toIntOrNull() ?: 0
+            }
+        }
+
+        val out = OutputStreamWriter(client.getOutputStream(), Charsets.UTF_8)
+        if (method == "POST" && path == "/submit") {
+            if (contentLength > MAX_BODY_BYTES) {
+                out.write(plainResponse("413 Payload Too Large", "文件过大（上限 10MB）"))
+                out.flush()
+                return null
+            }
+            val bodyBytes = ByteArray(contentLength.coerceAtLeast(0))
+            var readTotal = 0
+            while (readTotal < bodyBytes.size) {
+                val count = rawInput.read(bodyBytes, readTotal, bodyBytes.size - readTotal)
+                if (count == -1) break
+                readTotal += count
+            }
+            val result = parseJson(String(bodyBytes, 0, readTotal, Charsets.UTF_8))
+            out.write(
+                if (result != null) plainResponse("200 OK", "提交成功，可以关闭此页面")
+                else plainResponse("400 Bad Request", "数据格式无效")
+            )
+            out.flush()
+            return result
+        }
+
+        val bytes = HTML_PAGE.toByteArray(Charsets.UTF_8)
+        out.write("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n$HTML_PAGE")
+        out.flush()
+        return null
+    }
+
+    /** 读取 HTTP 头直到空行，超过上限视为非法请求 */
+    private fun readHeader(input: InputStream): String? {
+        val headerBytes = ByteArrayOutputStream()
+        var b: Int
+        var prev = -1
+        var prevPrev = -1
+        var prevPrevPrev = -1
+        while (input.read().also { b = it } != -1) {
+            headerBytes.write(b)
+            if (headerBytes.size() > MAX_HEADER_BYTES) return null
+            if (b == '\n'.code && prev == '\r'.code && prevPrev == '\n'.code && prevPrevPrev == '\r'.code) break
+            if (b == '\n'.code && prev == '\n'.code) break
+            prevPrevPrev = prevPrev
+            prevPrev = prev
+            prev = b
+        }
+        if (headerBytes.size() == 0) return null
+        return headerBytes.toString(Charsets.US_ASCII.name())
+    }
+
+    private fun plainResponse(status: String, message: String): String =
+        "HTTP/1.1 $status\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n$message"
 
     fun stop() {
         try { serverSocket?.close() } catch (_: Exception) {}
@@ -120,7 +137,7 @@ class QrCodeServer(private val port: Int = 0) {
 
     private fun parseJson(body: String): QrScanResult? {
         return try {
-            val root = com.google.gson.JsonParser.parseString(body).asJsonObject
+            val root = JsonParser.parseString(body).asJsonObject
             val type = root.get("type")?.asString ?: return null
             when (type) {
                 "m3u_url" -> QrScanResult(type = type, url = root.get("url")?.asString ?: "")
@@ -153,6 +170,9 @@ class QrCodeServer(private val port: Int = 0) {
     }
 
     companion object {
+        private const val CLIENT_TIMEOUT_MS = 10_000
+        private const val MAX_HEADER_BYTES = 16 * 1024
+        private const val MAX_BODY_BYTES = 10 * 1024 * 1024
         private val HTML_PAGE = """
 <!DOCTYPE html>
 <html>

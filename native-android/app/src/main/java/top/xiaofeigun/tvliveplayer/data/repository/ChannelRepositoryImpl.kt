@@ -2,6 +2,7 @@ package top.xiaofeigun.tvliveplayer.data.repository
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import top.xiaofeigun.tvliveplayer.data.local.TransactionRunner
 import top.xiaofeigun.tvliveplayer.data.local.dao.ChannelDao
 import top.xiaofeigun.tvliveplayer.data.local.dao.SourceDao
 import top.xiaofeigun.tvliveplayer.data.local.entity.ChannelEntity
@@ -11,6 +12,7 @@ import top.xiaofeigun.tvliveplayer.domain.model.Source
 import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
 import top.xiaofeigun.tvliveplayer.parser.M3UParser
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -20,7 +22,8 @@ import javax.inject.Singleton
 class ChannelRepositoryImpl @Inject constructor(
     private val channelDao: ChannelDao,
     private val sourceDao: SourceDao,
-    private val gson: Gson
+    private val gson: Gson,
+    private val transactionRunner: TransactionRunner
 ) : ChannelRepository {
 
     override fun getAllChannels(): Flow<List<Channel>> {
@@ -40,14 +43,9 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getCategories(): Flow<List<String>> {
-        return channelDao.getCategories()
-    }
-
     override fun getAllCategoriesWithFavorite(): Flow<List<String>> {
-        return channelDao.getCategories().map { categories ->
-            val hasFavorites = channelDao.getFavoriteChannels().first().isNotEmpty()
-            if (hasFavorites) {
+        return combine(channelDao.getCategories(), channelDao.getFavoriteChannels()) { categories, favorites ->
+            if (favorites.isNotEmpty()) {
                 listOf(ChannelRepository.FAVORITE_CATEGORY) + categories
             } else {
                 categories
@@ -55,18 +53,12 @@ class ChannelRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun searchChannels(query: String): Flow<List<Channel>> {
-        return channelDao.searchChannels(query).map { entities ->
-            entities.map { it.toDomainModel() }
-        }
-    }
-
-    override suspend fun getChannelById(id: String): Channel? {
-        return channelDao.getChannelById(id)?.toDomainModel()
-    }
-
     override suspend fun addChannels(channels: List<Channel>) {
         if (channels.isEmpty()) return
+        transactionRunner.run { mergeChannels(channels) }
+    }
+
+    private suspend fun mergeChannels(channels: List<Channel>) {
         val existingEntities = channelDao.getAllChannelsList()
         val existingMap = existingEntities.associateBy { M3UParser.normalizeKey(it.name) }.toMutableMap()
         var nextSortOrder = (channelDao.getMaxSortOrder() ?: -1) + 1
@@ -133,23 +125,14 @@ class ChannelRepositoryImpl @Inject constructor(
         channelDao.delete(ChannelEntity.fromDomainModel(channel))
     }
 
-    override suspend fun clearAllChannels() {
-        channelDao.deleteAll()
+    override suspend fun deleteCategory(category: String) {
+        if (category == ChannelRepository.FAVORITE_CATEGORY) return
+        channelDao.deleteByCategory(category)
     }
 
-    override suspend fun isFavorite(channelId: String): Boolean {
-        val entity = channelDao.getChannelById(channelId) ?: return false
-        return entity.favorite == 1
-    }
-
-    override suspend fun addFavorite(channelId: String) {
-        val entity = channelDao.getChannelById(channelId) ?: return
-        channelDao.update(entity.copy(favorite = 1))
-    }
-
-    override suspend fun removeFavorite(channelId: String) {
-        val entity = channelDao.getChannelById(channelId) ?: return
-        channelDao.update(entity.copy(favorite = 0))
+    override suspend fun mergeCategory(from: String, to: String) {
+        if (from == to || from == ChannelRepository.FAVORITE_CATEGORY || to == ChannelRepository.FAVORITE_CATEGORY) return
+        channelDao.moveCategory(from, to)
     }
 
     override suspend fun toggleFavorite(channelId: String): Boolean {
@@ -169,12 +152,11 @@ class ChannelRepositoryImpl @Inject constructor(
         sourceDao.insert(SourceEntity.fromDomainModel(source))
     }
 
-    override suspend fun deleteSource(source: Source) {
-        sourceDao.delete(SourceEntity.fromDomainModel(source))
-    }
-
-    override suspend fun clearAllSources() {
-        sourceDao.deleteAll()
+    override suspend fun clearAll() {
+        transactionRunner.run {
+            channelDao.deleteAll()
+            sourceDao.deleteAll()
+        }
     }
 
     override suspend fun exportData(): String {
@@ -191,30 +173,25 @@ class ChannelRepositoryImpl @Inject constructor(
     override suspend fun importData(json: String) {
         val export = gson.fromJson(json, ExportData::class.java) ?: return
 
-        // Clear existing data
-        channelDao.deleteAll()
-        sourceDao.deleteAll()
-
-        // Import channels
-        if (export.channels.isNotEmpty()) {
-            val channelEntities = export.channels.map { ChannelEntity.fromDomainModel(it) }
-            channelDao.insertAll(channelEntities)
-        }
-
-        // Import sources
-        export.sources.forEach { source ->
-            sourceDao.insert(SourceEntity.fromDomainModel(source))
+        // 清空与写入在同一事务中完成，避免 UI 观察到中间态空列表
+        transactionRunner.run {
+            channelDao.deleteAll()
+            sourceDao.deleteAll()
+            if (export.channels.isNotEmpty()) {
+                channelDao.insertAll(export.channels.map { ChannelEntity.fromDomainModel(it) })
+            }
+            export.sources.forEach { sourceDao.insert(SourceEntity.fromDomainModel(it)) }
         }
     }
 
     override suspend fun resetToDefaults() {
-        channelDao.deleteAll()
-        sourceDao.deleteAll()
-
-        val defaultChannels = DefaultChannels.getDefaultChannels()
-        if (defaultChannels.isNotEmpty()) {
-            val entities = defaultChannels.map { ChannelEntity.fromDomainModel(it) }
-            channelDao.insertAll(entities)
+        transactionRunner.run {
+            channelDao.deleteAll()
+            sourceDao.deleteAll()
+            val defaultChannels = DefaultChannels.getDefaultChannels()
+            if (defaultChannels.isNotEmpty()) {
+                channelDao.insertAll(defaultChannels.map { ChannelEntity.fromDomainModel(it) })
+            }
         }
     }
 

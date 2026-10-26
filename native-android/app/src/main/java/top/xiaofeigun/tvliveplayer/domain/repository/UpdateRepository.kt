@@ -7,5 +7,5 @@ import java.io.File
 
 interface UpdateRepository {
     suspend fun checkUpdate(currentVersionName: String): Result<UpdateInfo>
-    fun downloadApk(downloadUrl: String, destinationFile: File): Flow<DownloadState>
+    fun downloadApk(downloadUrl: String, destinationFile: File, expectedSize: Long = 0L): Flow<DownloadState>
 }

@@ -21,7 +21,8 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE favorite = 1 ORDER BY sortOrder ASC")
     fun getFavoriteChannels(): Flow<List<ChannelEntity>>
 
-    @Query("SELECT DISTINCT category FROM channels ORDER BY category")
+    /** 分类按其首个频道在源中的出现顺序排列，保留直播源原始分组顺序 */
+    @Query("SELECT category FROM channels GROUP BY category ORDER BY MIN(sortOrder) ASC")
     fun getCategories(): Flow<List<String>>
 
     @Query("SELECT * FROM channels WHERE id = :id")
@@ -48,6 +49,9 @@ interface ChannelDao {
     @Query("DELETE FROM channels")
     suspend fun deleteAll()
 
-    @Query("SELECT * FROM channels WHERE name LIKE '%' || :query || '%' ORDER BY sortOrder ASC")
-    fun searchChannels(query: String): Flow<List<ChannelEntity>>
+    @Query("DELETE FROM channels WHERE category = :category")
+    suspend fun deleteByCategory(category: String)
+
+    @Query("UPDATE channels SET category = :to WHERE category = :from")
+    suspend fun moveCategory(from: String, to: String)
 }

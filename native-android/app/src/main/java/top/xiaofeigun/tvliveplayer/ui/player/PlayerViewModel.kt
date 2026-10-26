@@ -6,10 +6,14 @@ import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
 import top.xiaofeigun.tvliveplayer.domain.model.Channel
 import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,7 +24,13 @@ enum class Page {
     ICON,
     SETTINGS,
     SOURCE_MGMT,
-    UPDATE
+    UPDATE;
+
+    /** Level 1 浮层（ICON / CATEGORY），二者互斥 */
+    val isLevel1: Boolean get() = this == CATEGORY || this == ICON
+
+    /** 以独立 Fragment 呈现的页面 */
+    val isFragmentPage: Boolean get() = this == SETTINGS || this == SOURCE_MGMT || this == UPDATE
 }
 
 data class PlayerUiState(
@@ -28,21 +38,20 @@ data class PlayerUiState(
     val allCategories: List<String> = emptyList(),
     val currentChannel: Channel? = null,
     val currentCategory: String = "",
-    val currentIndex: Int = 0,
-    val isFavorite: Boolean = false,
     val navStack: List<Page> = listOf(Page.PLAYER),
+    /** 抽屉当前分类，与 [categoryChannels] 总是成对更新 */
+    val selectedCategory: String = "",
     val categoryChannels: List<Channel> = emptyList(),
-    val selectedCategoryIndex: Int = 0,
     val selectedChannelIndex: Int = 0,
-    val showOsd: Boolean = false,
-    val osdText: String = "",
-    val osdCategory: String = "",
     val showExitConfirm: Boolean = false,
-    val videoPaused: Boolean = false,
-    val enteredByOk: Boolean = false,
     val channelsLoaded: Boolean = false
-)
+) {
+    val topPage: Page get() = navStack.last()
+    val isFavorite: Boolean get() = currentChannel?.isFavorite == true
+    val selectedCategoryIndex: Int get() = allCategories.indexOf(selectedCategory).coerceAtLeast(0)
+}
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: ChannelRepository,
@@ -52,353 +61,205 @@ class PlayerViewModel @Inject constructor(
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
+    /** 抽屉请求展示的分类；其频道列表由 Room Flow 驱动，增删改后自动刷新 */
+    private val requestedCategory = MutableStateFlow<String?>(null)
+
+    /** 打开抽屉时需要定位的频道，待对应分类的频道列表到达后消费 */
+    private var pendingFocusChannelId: String? = null
+
     init {
-        loadChannels()
+        observeChannels()
+        observeCategoryChannels()
     }
 
-    private fun loadChannels() {
+    private fun observeChannels() {
         viewModelScope.launch {
             repository.getAllChannels().collect { list ->
-                val stateVal = _state.value
                 val cats = repository.getAllCategoriesWithFavorite().first()
-
-                if (!stateVal.channelsLoaded) {
-                    val lastId = appPreferences.getLastChannelId()
-                    val targetChannel = if (lastId != null) {
-                        list.find { it.id == lastId } ?: list.firstOrNull()
-                    } else {
-                        list.firstOrNull()
-                    }
-                    val idx = if (targetChannel != null) list.indexOf(targetChannel) else 0
-                    val isFav = if (targetChannel != null) repository.isFavorite(targetChannel.id) else false
-                    val initialCategory = targetChannel?.category ?: cats.firstOrNull() ?: ""
-
-                    _state.update {
-                        it.copy(
-                            channels = list,
-                            allCategories = cats,
-                            currentChannel = targetChannel,
-                            currentCategory = initialCategory,
-                            currentIndex = idx,
-                            isFavorite = isFav,
-                            channelsLoaded = true
-                        )
-                    }
-                    if (targetChannel != null) {
-                        appPreferences.setLastChannelId(targetChannel.id)
-                    }
-                } else {
-                    val currentId = stateVal.currentChannel?.id
-                    val channelStillExists = currentId != null && list.any { it.id == currentId }
-
-                    if (list.isEmpty()) {
-                        _state.update {
-                            it.copy(
-                                channels = list,
-                                allCategories = cats,
-                                currentChannel = null,
-                                currentCategory = "",
-                                currentIndex = 0,
-                                isFavorite = false
-                            )
-                        }
-                    } else if (!channelStillExists) {
-                        val newChannel = list.first()
-                        val newIdx = 0
-                        val newIsFav = repository.isFavorite(newChannel.id)
-                        _state.update {
-                            it.copy(
-                                channels = list,
-                                allCategories = cats,
-                                currentChannel = newChannel,
-                                currentCategory = newChannel.category,
-                                currentIndex = newIdx,
-                                isFavorite = newIsFav,
-                                channelsLoaded = true
-                            )
-                        }
-                        saveLastChannel(newChannel)
-                    } else {
-                        val isFav = repository.isFavorite(currentId!!)
-                        _state.update {
-                            it.copy(
-                                channels = list,
-                                allCategories = cats,
-                                currentCategory = it.currentCategory.ifBlank { it.currentChannel?.category ?: "" },
-                                isFavorite = isFav
-                            )
-                        }
-                    }
-                }
+                onChannelsChanged(list, cats)
             }
         }
     }
 
-    private fun saveLastChannel(channel: Channel) {
+    private fun onChannelsChanged(list: List<Channel>, cats: List<String>) {
+        val s = _state.value
+        // 刷新当前频道实例（收藏状态等可能已变化）；当前频道被删除时回退到首个频道
+        val current = s.currentChannel?.let { cur -> list.find { it.id == cur.id } }
+        val target = if (!s.channelsLoaded) {
+            appPreferences.getLastChannelId()?.let { id -> list.find { it.id == id } } ?: list.firstOrNull()
+        } else {
+            current ?: list.firstOrNull()
+        }
+        val category = when {
+            target == null -> ""
+            current == null -> target.category
+            s.currentCategory == ChannelRepository.FAVORITE_CATEGORY && !target.isFavorite -> target.category
+            else -> s.currentCategory.ifBlank { target.category }
+        }
+
+        _state.update {
+            it.copy(
+                channels = list,
+                allCategories = cats,
+                currentChannel = target,
+                currentCategory = category,
+                channelsLoaded = true
+            )
+        }
+
+        // 抽屉分类被清空/合并后消失时，就近选择相邻分类
+        val requested = requestedCategory.value
+        if (requested != null && requested !in cats) {
+            requestedCategory.value = cats.getOrNull(s.selectedCategoryIndex.coerceAtMost(cats.size - 1))
+        }
+
+        if (target != null && target.id != s.currentChannel?.id) {
+            appPreferences.setLastChannelId(target.id)
+        }
+    }
+
+    private fun observeCategoryChannels() {
+        viewModelScope.launch {
+            requestedCategory
+                .flatMapLatest { cat ->
+                    if (cat == null) emptyFlow() else repository.getChannelsByCategory(cat).map { cat to it }
+                }
+                .collect { (cat, channels) ->
+                    val focusId = pendingFocusChannelId
+                    pendingFocusChannelId = null
+                    _state.update { st ->
+                        val focusIdx = focusId?.let { id -> channels.indexOfFirst { it.id == id } }?.takeIf { it >= 0 }
+                        val idx = focusIdx ?: if (cat == st.selectedCategory) st.selectedChannelIndex else 0
+                        st.copy(
+                            selectedCategory = cat,
+                            categoryChannels = channels,
+                            selectedChannelIndex = idx.coerceIn(0, (channels.size - 1).coerceAtLeast(0))
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun playChannel(channel: Channel, category: String) {
+        _state.update { it.copy(currentChannel = channel, currentCategory = category) }
         appPreferences.setLastChannelId(channel.id)
     }
 
-    fun playChannel(channel: Channel, category: String? = null) {
-        val targetCat = category ?: run {
-            val cur = _state.value.currentCategory
-            if (cur == ChannelRepository.FAVORITE_CATEGORY && channel.isFavorite) {
-                ChannelRepository.FAVORITE_CATEGORY
-            } else {
-                channel.category
-            }
-        }
-        val idx = _state.value.channels.indexOfFirst { it.id == channel.id }
-        _state.update {
-            it.copy(
-                currentChannel = channel,
-                currentCategory = targetCat,
-                currentIndex = if (idx >= 0) idx else 0,
-                isFavorite = channel.isFavorite,
-                videoPaused = false
-            )
-        }
-        saveLastChannel(channel)
-    }
+    fun nextChannel() = switchChannel(1)
 
-    fun nextChannel() {
+    fun previousChannel() = switchChannel(-1)
+
+    private fun switchChannel(delta: Int) {
         val s = _state.value
         val list = s.channels
         if (list.isEmpty()) return
-        val curIdx = list.indexOfFirst { it.id == s.currentChannel?.id }.let { if (it >= 0) it else s.currentIndex }
-        val newIdx = (curIdx + 1) % list.size
-        val ch = list[newIdx]
-        viewModelScope.launch {
-            val isFav = repository.isFavorite(ch.id)
-            _state.update {
-                it.copy(
-                    currentChannel = ch,
-                    currentCategory = ch.category,
-                    currentIndex = newIdx,
-                    isFavorite = isFav,
-                    videoPaused = false
-                )
-            }
-            saveLastChannel(ch)
-        }
+        val curIdx = list.indexOfFirst { it.id == s.currentChannel?.id }.coerceAtLeast(0)
+        val ch = list[(curIdx + delta).mod(list.size)]
+        playChannel(ch, ch.category)
     }
 
-    fun previousChannel() {
+    // ---------------- 选台抽屉 ----------------
+
+    fun enterCategorySelect() {
         val s = _state.value
-        val list = s.channels
-        if (list.isEmpty()) return
-        val curIdx = list.indexOfFirst { it.id == s.currentChannel?.id }.let { if (it >= 0) it else s.currentIndex }
-        val newIdx = (curIdx - 1 + list.size) % list.size
-        val ch = list[newIdx]
-        viewModelScope.launch {
-            val isFav = repository.isFavorite(ch.id)
-            _state.update {
-                it.copy(
-                    currentChannel = ch,
-                    currentCategory = ch.category,
-                    currentIndex = newIdx,
-                    isFavorite = isFav,
-                    videoPaused = false
-                )
-            }
-            saveLastChannel(ch)
+        val cat = s.currentCategory.takeIf { it in s.allCategories }
+            ?: s.currentChannel?.category?.takeIf { it in s.allCategories }
+            ?: s.allCategories.firstOrNull()
+            ?: return
+        val currentId = s.currentChannel?.id
+        if (cat == s.selectedCategory && cat == requestedCategory.value) {
+            // 分类未变，列表已就绪，直接定位
+            val idx = s.categoryChannels.indexOfFirst { it.id == currentId }
+            _state.update { it.copy(selectedChannelIndex = if (idx >= 0) idx else it.selectedChannelIndex) }
+        } else {
+            pendingFocusChannelId = currentId
+            requestedCategory.value = cat
         }
+        pushPage(Page.CATEGORY)
     }
 
     fun selectCategory(index: Int) {
-        val cats = _state.value.allCategories
-        if (index < 0 || index >= cats.size) return
-        val cat = cats[index]
-        viewModelScope.launch {
-            val channels = repository.getChannelsByCategory(cat).first()
-            _state.update {
-                it.copy(
-                    selectedCategoryIndex = index,
-                    categoryChannels = channels,
-                    selectedChannelIndex = 0
-                )
-            }
-        }
+        val cat = _state.value.allCategories.getOrNull(index) ?: return
+        requestedCategory.value = cat
     }
 
     fun focusCategoryChannel(index: Int) {
-        val chs = _state.value.categoryChannels
-        if (index < 0 || index >= chs.size) return
+        if (index !in _state.value.categoryChannels.indices) return
         _state.update { it.copy(selectedChannelIndex = index) }
     }
 
     fun confirmCategorySelect() {
         val s = _state.value
-        val chs = s.categoryChannels
-        val idx = s.selectedChannelIndex
-        val cat = s.allCategories.getOrNull(s.selectedCategoryIndex)
-        if (chs.isNotEmpty() && idx in chs.indices) {
-            playChannel(chs[idx], category = cat)
-        }
-        _state.update { it.copy(navStack = ensureSingleLevel1Path(listOf(Page.PLAYER))) }
+        s.categoryChannels.getOrNull(s.selectedChannelIndex)?.let { playChannel(it, s.selectedCategory) }
+        _state.update { it.copy(navStack = listOf(Page.PLAYER)) }
     }
 
-    fun resetToPlayer() {
-        _state.update {
-            it.copy(
-                navStack = ensureSingleLevel1Path(listOf(Page.PLAYER)),
-                videoPaused = false,
-                enteredByOk = false
-            )
-        }
-    }
-
-    fun cancelCategorySelect() {
-        _state.update { it.copy(navStack = ensureSingleLevel1Path(listOf(Page.PLAYER))) }
-    }
-
-    fun enterCategorySelect() {
-        val s = _state.value
-        val curCat = s.currentCategory.ifBlank { s.currentChannel?.category } ?: s.allCategories.firstOrNull() ?: return
-        val catIdx = s.allCategories.indexOf(curCat).let { if (it >= 0) it else 0 }
-        val targetCat = s.allCategories.getOrNull(catIdx) ?: curCat
-        viewModelScope.launch {
-            val channels = repository.getChannelsByCategory(targetCat).first()
-            val chIdx = channels.indexOfFirst { it.id == s.currentChannel?.id }.coerceAtLeast(0)
-            _state.update {
-                val cur = it.navStack
-                val newStack = if (cur.size >= 2 && cur[1] in listOf(Page.ICON, Page.CATEGORY)) {
-                    cur.toMutableList().apply { this[1] = Page.CATEGORY }
-                } else {
-                    listOf(Page.PLAYER, Page.CATEGORY)
-                }
-                it.copy(
-                    navStack = ensureSingleLevel1Path(newStack),
-                    selectedCategoryIndex = catIdx,
-                    categoryChannels = channels,
-                    selectedChannelIndex = chIdx
-                )
-            }
-        }
-    }
-
-    /** Ensure Level 1 pages (ICON/CATEGORY) are mutually exclusive — only one at position 1 */
-    private fun ensureSingleLevel1Path(stack: List<Page>): List<Page> {
-        val l1Indices = stack.mapIndexedNotNull { i, p -> if (p == Page.ICON || p == Page.CATEGORY) i else null }
-        if (l1Indices.size <= 1) return stack
-        // Keep the last Level 1 entry, remove the rest
-        val keep = l1Indices.last()
-        return stack.filterIndexed { i, _ -> i == keep || (i !in l1Indices) }
-    }
+    // ---------------- 导航栈 ----------------
 
     fun pushPage(page: Page) {
-        _state.update { s ->
-            val stack = s.navStack.toMutableList()
-            if (page == Page.ICON || page == Page.CATEGORY) {
-                if (stack.size >= 2 && stack[1] in listOf(Page.ICON, Page.CATEGORY)) {
-                    stack[1] = page
-                } else if (stack.size == 1) {
-                    stack.add(page)
-                }
-            } else {
-                if (stack.lastOrNull() != page) {
-                    stack.add(page)
-                }
-            }
-            s.copy(navStack = ensureSingleLevel1Path(stack))
-        }
+        _state.update { it.copy(navStack = pushed(it.navStack, page)) }
     }
 
-    fun popPage(): Boolean {
+    fun popPage() {
+        _state.update { if (it.navStack.size > 1) it.copy(navStack = it.navStack.dropLast(1)) else it }
+    }
+
+    /**
+     * 统一返回逻辑（遥控器返回 / Esc / 手势返回 / 触屏返回按钮）。
+     * @return true 表示应退出应用
+     */
+    fun onBack(): Boolean {
         val s = _state.value
-        if (s.navStack.size <= 1) {
-            if (s.navStack.last() == Page.PLAYER) {
-                _state.update { it.copy(showExitConfirm = true) }
-            }
+        if (s.navStack.size > 1) {
+            popPage()
             return false
         }
-        _state.update { it.copy(navStack = ensureSingleLevel1Path(it.navStack.dropLast(1))) }
-        return true
+        if (s.showExitConfirm) return true
+        _state.update { it.copy(showExitConfirm = true) }
+        return false
     }
 
     fun dismissExitConfirm() {
         _state.update { it.copy(showExitConfirm = false) }
     }
 
-    fun toggleFavorite() {
-        val channel = _state.value.currentChannel ?: return
-        toggleFavorite(channel.id)
-    }
+    // ---------------- 收藏与频道管理 ----------------
 
-    fun toggleFavorite(channelId: String) {
-        viewModelScope.launch {
-            repository.toggleFavorite(channelId)
-            val state = _state.value
-            val isFav = state.currentChannel?.let { repository.isFavorite(it.id) } ?: false
-            val cat = state.allCategories.getOrNull(state.selectedCategoryIndex)
-            val updatedChannels = if (cat != null) repository.getChannelsByCategory(cat).first() else state.categoryChannels
-            _state.update {
-                it.copy(categoryChannels = updatedChannels, isFavorite = isFav)
-            }
-        }
+    fun toggleFavorite(channelId: String? = _state.value.currentChannel?.id) {
+        channelId ?: return
+        viewModelScope.launch { repository.toggleFavorite(channelId) }
     }
 
     fun deleteCategoryChannel(index: Int) {
-        val chs = _state.value.categoryChannels
-        if (index < 0 || index >= chs.size) return
-        viewModelScope.launch {
-            repository.deleteChannel(chs[index])
-            val cat = _state.value.allCategories.getOrNull(_state.value.selectedCategoryIndex)
-            if (cat != null) {
-                val updated = repository.getChannelsByCategory(cat).first()
-                val newIdx = if (index >= updated.size) updated.size - 1 else index
-                _state.update { it.copy(categoryChannels = updated, selectedChannelIndex = newIdx.coerceAtLeast(0)) }
-            }
-            refreshAll()
-        }
+        val ch = _state.value.categoryChannels.getOrNull(index) ?: return
+        viewModelScope.launch { repository.deleteChannel(ch) }
     }
 
     fun moveCategoryChannel(index: Int, targetCategory: String) {
-        val chs = _state.value.categoryChannels
-        if (index < 0 || index >= chs.size) return
-        viewModelScope.launch {
-            repository.updateChannel(chs[index].copy(category = targetCategory))
-            val cat = _state.value.allCategories.getOrNull(_state.value.selectedCategoryIndex)
-            if (cat != null) {
-                val updated = repository.getChannelsByCategory(cat).first()
-                val newIdx = if (index >= updated.size) updated.size - 1 else index
-                _state.update { it.copy(categoryChannels = updated, selectedChannelIndex = newIdx.coerceAtLeast(0)) }
-            }
-            refreshAll()
-        }
+        val ch = _state.value.categoryChannels.getOrNull(index) ?: return
+        viewModelScope.launch { repository.updateChannel(ch.copy(category = targetCategory)) }
+    }
+
+    fun mergeCategory(from: String, to: String) {
+        viewModelScope.launch { repository.mergeCategory(from, to) }
     }
 
     fun deleteCategory(category: String) {
-        viewModelScope.launch {
-            val channels = repository.getChannelsByCategory(category).first()
-            channels.forEach { repository.deleteChannel(it) }
-            val updatedCats = repository.getAllCategoriesWithFavorite().first()
-            val oldIndex = _state.value.selectedCategoryIndex
-            val newCatIndex = if (updatedCats.isEmpty()) 0 else oldIndex.coerceAtMost(updatedCats.size - 1)
-            val newCat = updatedCats.getOrNull(newCatIndex)
-            val newChannels = if (newCat != null) repository.getChannelsByCategory(newCat).first() else emptyList()
-            _state.update {
-                it.copy(
-                    allCategories = updatedCats,
-                    selectedCategoryIndex = newCatIndex,
-                    categoryChannels = newChannels,
-                    selectedChannelIndex = 0
-                )
+        viewModelScope.launch { repository.deleteCategory(category) }
+    }
+
+    companion object {
+        /**
+         * 入栈规则：已在栈中的页面回退到该页（不重复叠加）；
+         * Level 1 页面（ICON / CATEGORY）互斥，始终位于栈的第 2 层。
+         */
+        internal fun pushed(stack: List<Page>, page: Page): List<Page> {
+            val idx = stack.indexOf(page)
+            return when {
+                idx >= 0 -> stack.subList(0, idx + 1).toList()
+                page.isLevel1 -> listOf(Page.PLAYER, page)
+                else -> stack + page
             }
-            refreshAll()
-        }
-    }
-
-    fun refreshCategoryChannels(category: String) {
-        viewModelScope.launch {
-            val channels = repository.getChannelsByCategory(category).first()
-            _state.update { it.copy(categoryChannels = channels) }
-        }
-    }
-
-    fun refreshAll() {
-        viewModelScope.launch {
-            val cats = repository.getAllCategoriesWithFavorite().first()
-            _state.update { it.copy(allCategories = cats) }
         }
     }
 }

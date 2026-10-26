@@ -20,10 +20,6 @@
 -dontwarn dagger.hilt.**
 -keep class dagger.hilt.** { *; }
 
-# Coil 3.x
--dontwarn coil3.**
--keep class coil3.** { *; }
-
 # OkHttp & Okio
 -dontwarn okhttp3.**
 -dontwarn okio.**

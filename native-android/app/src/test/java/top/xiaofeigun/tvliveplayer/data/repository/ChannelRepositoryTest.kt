@@ -1,73 +1,29 @@
 package top.xiaofeigun.tvliveplayer.data.repository
 
 import com.google.gson.Gson
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import top.xiaofeigun.tvliveplayer.data.local.dao.ChannelDao
-import top.xiaofeigun.tvliveplayer.data.local.dao.SourceDao
 import top.xiaofeigun.tvliveplayer.data.local.entity.ChannelEntity
-import top.xiaofeigun.tvliveplayer.data.local.entity.SourceEntity
 import top.xiaofeigun.tvliveplayer.domain.model.Channel
+import top.xiaofeigun.tvliveplayer.domain.model.Source
+import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
+import top.xiaofeigun.tvliveplayer.testutil.FakeChannelDao
+import top.xiaofeigun.tvliveplayer.testutil.FakeSourceDao
+import top.xiaofeigun.tvliveplayer.testutil.ImmediateTransactionRunner
 
 class ChannelRepositoryTest {
 
     private lateinit var fakeChannelDao: FakeChannelDao
     private lateinit var repository: ChannelRepositoryImpl
 
-    class FakeChannelDao : ChannelDao {
-        val channels = mutableListOf<ChannelEntity>()
-
-        override fun getAllChannels(): Flow<List<ChannelEntity>> = flowOf(channels)
-        override suspend fun getAllChannelsList(): List<ChannelEntity> = channels.toList()
-        override fun getChannelsByCategory(category: String): Flow<List<ChannelEntity>> =
-            flowOf(channels.filter { it.category == category })
-        override fun getFavoriteChannels(): Flow<List<ChannelEntity>> =
-            flowOf(channels.filter { it.favorite == 1 })
-        override fun getCategories(): Flow<List<String>> =
-            flowOf(channels.map { it.category }.distinct())
-        override suspend fun getChannelById(id: String): ChannelEntity? =
-            channels.find { it.id == id }
-        override suspend fun getMaxSortOrder(): Int? =
-            channels.maxOfOrNull { it.sortOrder }
-        override suspend fun insertAll(newChannels: List<ChannelEntity>) {
-            channels.addAll(newChannels)
-        }
-        override suspend fun update(channel: ChannelEntity) {
-            val idx = channels.indexOfFirst { it.id == channel.id }
-            if (idx != -1) channels[idx] = channel
-        }
-        override suspend fun updateAll(toUpdate: List<ChannelEntity>) {
-            for (ch in toUpdate) {
-                val idx = channels.indexOfFirst { it.id == ch.id }
-                if (idx != -1) channels[idx] = ch
-            }
-        }
-        override suspend fun delete(channel: ChannelEntity) {
-            channels.removeAll { it.id == channel.id }
-        }
-        override suspend fun deleteAll() {
-            channels.clear()
-        }
-        override fun searchChannels(query: String): Flow<List<ChannelEntity>> =
-            flowOf(channels.filter { it.name.contains(query) })
-    }
-
     @Before
     fun setup() {
         fakeChannelDao = FakeChannelDao()
-        val fakeSourceDao = object : SourceDao {
-            override fun getAllSources(): Flow<List<SourceEntity>> = flowOf(emptyList())
-            override suspend fun getSourceById(id: String): SourceEntity? = null
-            override suspend fun insert(source: SourceEntity) {}
-            override suspend fun delete(source: SourceEntity) {}
-            override suspend fun deleteAll() {}
-        }
-        repository = ChannelRepositoryImpl(fakeChannelDao, fakeSourceDao, Gson())
+        repository = ChannelRepositoryImpl(fakeChannelDao, FakeSourceDao(), Gson(), ImmediateTransactionRunner)
     }
 
     @Test
@@ -154,5 +110,58 @@ class ChannelRepositoryTest {
         assertEquals("http://same.com/live.m3u8", cctv2.url)
         // The duplicate URL A is not duplicated in backupUrls!
         assertEquals("http://new.com/live.m3u8", cctv2.backupUrls)
+    }
+
+    private fun seed() {
+        fakeChannelDao.seed(
+            listOf(
+                ChannelEntity(id = "a1", name = "CCTV-1", url = "http://a1", category = "央视", sortOrder = 0),
+                ChannelEntity(id = "b1", name = "湖南卫视", url = "http://b1", category = "卫视", sortOrder = 1, favorite = 1),
+                ChannelEntity(id = "a2", name = "CCTV-2", url = "http://a2", category = "央视", sortOrder = 2),
+                ChannelEntity(id = "c1", name = "本地台", url = "http://c1", category = "地方", sortOrder = 3)
+            )
+        )
+    }
+
+    @Test
+    fun testCategoriesKeepSourceOrderWithFavoriteFirst() = runBlocking {
+        seed()
+        assertEquals(
+            listOf(ChannelRepository.FAVORITE_CATEGORY, "央视", "卫视", "地方"),
+            repository.getAllCategoriesWithFavorite().first()
+        )
+    }
+
+    @Test
+    fun testMergeCategoryMovesAllChannels() = runBlocking {
+        seed()
+        repository.mergeCategory("地方", "央视")
+        assertEquals(listOf("a1", "a2", "c1"), repository.getChannelsByCategory("央视").first().map { it.id })
+        assertTrue("地方" !in repository.getAllCategoriesWithFavorite().first())
+        // 收藏是虚拟分类，不可作为合并源或目标
+        repository.mergeCategory(ChannelRepository.FAVORITE_CATEGORY, "地方")
+        assertEquals(1, repository.getChannelsByCategory(ChannelRepository.FAVORITE_CATEGORY).first().size)
+    }
+
+    @Test
+    fun testDeleteCategoryRemovesOnlyThatCategory() = runBlocking {
+        seed()
+        repository.deleteCategory("央视")
+        assertEquals(listOf("b1", "c1"), fakeChannelDao.channels.map { it.id })
+    }
+
+    @Test
+    fun testExportImportRoundTripReplacesData() = runBlocking {
+        seed()
+        repository.addSource(Source(id = "http://s", name = "s", url = "http://s"))
+        val json = repository.exportData()
+        repository.clearAll()
+        assertTrue(fakeChannelDao.channels.isEmpty())
+        assertTrue(repository.getAllSources().first().isEmpty())
+
+        repository.importData(json)
+        assertEquals(4, fakeChannelDao.channels.size)
+        assertEquals(1, fakeChannelDao.channels.first { it.id == "b1" }.favorite)
+        assertEquals(listOf("http://s"), repository.getAllSources().first().map { it.url })
     }
 }

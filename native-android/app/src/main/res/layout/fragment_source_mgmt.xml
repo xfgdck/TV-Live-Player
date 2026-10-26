@@ -48,13 +48,26 @@
             android:clickable="true" />
 
         <TextView
+            android:id="@+id/btn_refresh"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/menu_item_bg"
+            android:gravity="center"
+            android:text="更新订阅源"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:focusable="true"
+            android:clickable="true" />
+
+        <TextView
             android:id="@+id/btn_clear"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="8dp"
             android:background="@drawable/menu_item_bg"
             android:gravity="center"
-            android:text="清空节目单"
+            android:text="清空节目单与订阅"
             android:textColor="@color/error_color"
             android:textSize="16sp"
             android:focusable="true"

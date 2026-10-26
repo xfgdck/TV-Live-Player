@@ -6,12 +6,16 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import top.xiaofeigun.tvliveplayer.R
-import top.xiaofeigun.tvliveplayer.ui.settings.UpdateFragment
+import top.xiaofeigun.tvliveplayer.ui.player.Page
+import top.xiaofeigun.tvliveplayer.ui.player.PlayerViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class SettingsFragment : Fragment() {
+
+    private val playerViewModel: PlayerViewModel by activityViewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -22,10 +26,8 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        view.findViewById<TextView>(R.id.btn_update).setOnClickListener {
-            (activity as? top.xiaofeigun.tvliveplayer.MainActivity)?.showUpdate()
-        }
-
-        view.findViewById<TextView>(R.id.btn_update).requestFocus()
+        val btnUpdate = view.findViewById<TextView>(R.id.btn_update)
+        btnUpdate.setOnClickListener { playerViewModel.pushPage(Page.UPDATE) }
+        btnUpdate.requestFocus()
     }
 }

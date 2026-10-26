@@ -11,24 +11,20 @@ interface ChannelRepository {
 
     fun getAllChannels(): Flow<List<Channel>>
     fun getChannelsByCategory(category: String): Flow<List<Channel>>
-    fun getCategories(): Flow<List<String>>
     fun getAllCategoriesWithFavorite(): Flow<List<String>>
-    fun searchChannels(query: String): Flow<List<Channel>>
-    suspend fun getChannelById(id: String): Channel?
     suspend fun addChannels(channels: List<Channel>)
     suspend fun updateChannel(channel: Channel)
     suspend fun deleteChannel(channel: Channel)
-    suspend fun clearAllChannels()
-    suspend fun isFavorite(channelId: String): Boolean
-    suspend fun addFavorite(channelId: String)
-    suspend fun removeFavorite(channelId: String)
+    suspend fun deleteCategory(category: String)
+    /** 将 [from] 分类下全部频道并入 [to]，[from] 分类随之消失 */
+    suspend fun mergeCategory(from: String, to: String)
     suspend fun toggleFavorite(channelId: String): Boolean
 
     fun getAllSources(): Flow<List<Source>>
     suspend fun addSource(source: Source)
-    suspend fun deleteSource(source: Source)
-    suspend fun clearAllSources()
 
+    /** 清空全部频道与订阅源 */
+    suspend fun clearAll()
     suspend fun exportData(): String  // JSON
     suspend fun importData(json: String)
     suspend fun resetToDefaults()

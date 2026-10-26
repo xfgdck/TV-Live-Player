@@ -49,8 +49,8 @@ class M3UParser @Inject constructor() {
                 val tvgId = attrs["tvg-id"]
                 val tvgName = attrs["tvg-name"]
 
-                // Channel name is after the first comma
-                val commaIdx = line.indexOf(',')
+                // Channel name is after the first comma outside quoted attribute values
+                val commaIdx = indexOfUnquotedComma(line)
                 var name = if (commaIdx != -1 && commaIdx + 1 < line.length) {
                     line.substring(commaIdx + 1).trim()
                 } else {
@@ -109,6 +109,19 @@ class M3UParser @Inject constructor() {
             i++
         }
         return channels
+    }
+
+    private fun indexOfUnquotedComma(line: String): Int {
+        var quote: Char? = null
+        line.forEachIndexed { i, c ->
+            when {
+                quote != null -> if (c == quote) quote = null
+                c == '"' || c == '\'' -> quote = c
+                c == ',' -> return i
+            }
+        }
+        // 引号未闭合（不规范的源）时退回首个逗号
+        return line.indexOf(',')
     }
 
     private fun parseTxt(content: String, sourceCategory: String? = null): List<Channel> {
@@ -319,65 +332,76 @@ class M3UParser @Inject constructor() {
             var clean = name.lowercase().trim()
 
             // 1. Remove bracketed quality tags like [高清], (1080P), 【HD】, [4K], etc.
-            val bracketTagRegex = Regex("""[\(\[\{（【][^)\]}）】]*(hd|fhd|uhd|4k|8k|1080p|720p|高清|超清|标清|蓝光|ipv6|ipv4|hevc|h265|h264|测试|备用|专线|移动|联通|电信|联通)[^)\]}）】]*[\)\]\}）】]""", RegexOption.IGNORE_CASE)
-            clean = clean.replace(bracketTagRegex, " ")
+            clean = clean.replace(BRACKET_TAG_REGEX, " ")
 
             // Remove any leftover brackets
-            clean = clean.replace(Regex("""[\(\)\[\]{}（）【】]"""), " ")
+            clean = clean.replace(BRACKET_REGEX, " ")
 
             // 2. Strip standalone quality keywords
-            val qualityKeywords = listOf(
-                "1080p", "720p", "4k", "8k", "fhd", "uhd", "hd", "sd",
-                "hevc", "h265", "h264", "ipv6", "ipv4",
-                "超高清", "高清", "超清", "标清", "蓝光", "测试", "备用", "专线"
-            )
-            for (kw in qualityKeywords) {
+            for (kw in QUALITY_KEYWORDS) {
                 clean = clean.replace(kw, " ")
             }
 
             // 3. Normalize CCTV naming
-            // E.g. "cctv-1", "cctv 1", "cctv1" -> "cctv1"
-            val cctvNumRegex = Regex("""cctv\s*[-_]?\s*(\d+)(\+?)""")
-            val cctvNumMatch = cctvNumRegex.find(clean)
+            // E.g. "cctv-1", "cctv 1", "cctv1" -> "cctv1"; 区域版本单独保留: "CCTV4 欧洲" -> "cctv4欧洲"
+            val region = CCTV_REGIONS.firstOrNull { clean.contains(it) }.orEmpty()
+            val cctvNumMatch = CCTV_NUM_REGEX.find(clean)
             if (cctvNumMatch != null) {
                 val num = cctvNumMatch.groupValues[1]
                 val plus = cctvNumMatch.groupValues[2]
-                return "cctv$num$plus"
+                return "cctv$num$plus$region"
             }
 
             // Named CCTV channels mapping
             if (clean.contains("cctv")) {
-                when {
-                    clean.contains("综合") -> return "cctv1"
-                    clean.contains("财经") -> return "cctv2"
-                    clean.contains("综艺") -> return "cctv3"
-                    clean.contains("中文国际") || clean.contains("国际") -> return "cctv4"
-                    clean.contains("体育赛事") || clean.contains("5+") -> return "cctv5+"
-                    clean.contains("体育") -> return "cctv5"
-                    clean.contains("电影") -> return "cctv6"
-                    clean.contains("国防军事") || clean.contains("军事") -> return "cctv7"
-                    clean.contains("电视剧") -> return "cctv8"
-                    clean.contains("纪录") -> return "cctv9"
-                    clean.contains("科教") -> return "cctv10"
-                    clean.contains("戏曲") -> return "cctv11"
-                    clean.contains("社会与法") -> return "cctv12"
-                    clean.contains("新闻") -> return "cctv13"
-                    clean.contains("少儿") -> return "cctv14"
-                    clean.contains("音乐") -> return "cctv15"
-                    clean.contains("奥林匹克") || clean.contains("奥运") -> return "cctv16"
-                    clean.contains("农业农村") || clean.contains("农业") -> return "cctv17"
+                val mapped = when {
+                    clean.contains("综合") -> "cctv1"
+                    clean.contains("财经") -> "cctv2"
+                    clean.contains("综艺") -> "cctv3"
+                    clean.contains("中文国际") || clean.contains("国际") -> "cctv4"
+                    clean.contains("体育赛事") || clean.contains("5+") -> "cctv5+"
+                    clean.contains("体育") -> "cctv5"
+                    clean.contains("电影") -> "cctv6"
+                    clean.contains("国防军事") || clean.contains("军事") -> "cctv7"
+                    clean.contains("电视剧") -> "cctv8"
+                    clean.contains("纪录") -> "cctv9"
+                    clean.contains("科教") -> "cctv10"
+                    clean.contains("戏曲") -> "cctv11"
+                    clean.contains("社会与法") -> "cctv12"
+                    clean.contains("新闻") -> "cctv13"
+                    clean.contains("少儿") -> "cctv14"
+                    clean.contains("音乐") -> "cctv15"
+                    clean.contains("奥林匹克") || clean.contains("奥运") -> "cctv16"
+                    clean.contains("农业农村") || clean.contains("农业") -> "cctv17"
+                    else -> null
                 }
+                if (mapped != null) return mapped + region
             }
 
-            // 4. Satellite TV channels: "湖南卫视 综合" -> "湖南卫视"
-            val satelliteMatch = Regex("""(\S+卫视)""").find(clean)
+            // 4. Satellite TV channels: "湖南卫视 综合" -> "湖南卫视"，但 "凤凰卫视中文台" 与 "凤凰卫视资讯台" 保持区分
+            val satelliteMatch = SATELLITE_REGEX.find(clean)
             if (satelliteMatch != null) {
-                return satelliteMatch.groupValues[1].replace(Regex("""[\s\-_]"""), "")
+                val base = satelliteMatch.groupValues[1].replace(SEPARATOR_REGEX, "")
+                val suffix = clean.substring(satelliteMatch.range.last + 1).replace(SEPARATOR_REGEX, "")
+                return if (suffix in SATELLITE_GENERIC_SUFFIXES) base else base + suffix
             }
 
             // 5. Remove all remaining spaces, hyphens, and underscores
-            clean = clean.replace(Regex("""[\s\-_.:/，,]+"""), "")
+            clean = clean.replace(SEPARATOR_REGEX, "")
             return clean.ifEmpty { name.trim().lowercase() }
         }
+
+        private val BRACKET_TAG_REGEX = Regex("""[\(\[\{（【][^)\]}）】]*(hd|fhd|uhd|4k|8k|1080p|720p|高清|超清|标清|蓝光|ipv6|ipv4|hevc|h265|h264|测试|备用|专线|移动|联通|电信)[^)\]}）】]*[\)\]\}）】]""", RegexOption.IGNORE_CASE)
+        private val BRACKET_REGEX = Regex("""[\(\)\[\]{}（）【】]""")
+        private val CCTV_NUM_REGEX = Regex("""cctv\s*[-_]?\s*(\d+)(\+?)""")
+        private val SATELLITE_REGEX = Regex("""(\S+卫视)""")
+        private val SEPARATOR_REGEX = Regex("""[\s\-_.:/，,]+""")
+        private val QUALITY_KEYWORDS = listOf(
+            "1080p", "720p", "4k", "8k", "fhd", "uhd", "hd", "sd",
+            "hevc", "h265", "h264", "ipv6", "ipv4",
+            "超高清", "高清", "超清", "标清", "蓝光", "测试", "备用", "专线"
+        )
+        private val CCTV_REGIONS = listOf("欧洲", "美洲", "北美", "亚洲")
+        private val SATELLITE_GENERIC_SUFFIXES = setOf("", "综合", "频道", "综合频道", "台")
     }
 }

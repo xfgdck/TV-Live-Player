@@ -192,5 +192,36 @@ class M3UParserTest {
         assertEquals("湖南卫视", M3UParser.normalizeKey("湖南卫视 高清"))
         assertEquals("湖南卫视", M3UParser.normalizeKey("【超清】湖南卫视"))
         assertEquals("东方卫视", M3UParser.normalizeKey("东方卫视 (1080P)"))
+        assertEquals("湖南卫视", M3UParser.normalizeKey("湖南卫视 综合"))
+    }
+
+    @Test
+    fun testDistinctChannelsAreNotMerged() {
+        assertEquals("凤凰卫视中文台", M3UParser.normalizeKey("凤凰卫视中文台"))
+        assertEquals("凤凰卫视资讯台", M3UParser.normalizeKey("凤凰卫视资讯台 HD"))
+        assertEquals("cctv4欧洲", M3UParser.normalizeKey("CCTV-4 欧洲"))
+        assertEquals("cctv4美洲", M3UParser.normalizeKey("CCTV4美洲"))
+        assertEquals("cctv4", M3UParser.normalizeKey("CCTV-4 中文国际"))
+
+        val content = """
+            #EXTM3U
+            #EXTINF:-1,凤凰卫视中文台
+            http://example.com/zw.m3u8
+            #EXTINF:-1,凤凰卫视资讯台
+            http://example.com/zx.m3u8
+        """.trimIndent()
+        assertEquals(2, parser.parse(content).size)
+    }
+
+    @Test
+    fun testCommaInsideQuotedAttribute() {
+        val content = """
+            #EXTM3U
+            #EXTINF:-1 group-title="新闻,资讯" tvg-name="CCTV-13",CCTV-13 新闻
+            http://example.com/cctv13.m3u8
+        """.trimIndent()
+        val ch = parser.parse(content).single()
+        assertEquals("CCTV-13 新闻", ch.name)
+        assertEquals("新闻,资讯", ch.category)
     }
 }

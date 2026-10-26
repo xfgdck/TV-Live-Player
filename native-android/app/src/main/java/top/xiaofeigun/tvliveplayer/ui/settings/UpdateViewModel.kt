@@ -99,7 +99,7 @@ class UpdateViewModel @Inject constructor(
             val destinationFile = File(destinationDir, updateInfo.apkName ?: "TV-Live-Player-latest.apk")
             downloadedApkFile = destinationFile
 
-            updateRepository.downloadApk(downloadUrl, destinationFile).collect { state ->
+            updateRepository.downloadApk(downloadUrl, destinationFile, updateInfo.apkSize).collect { state ->
                 when (state) {
                     is DownloadState.Idle -> {}
                     is DownloadState.Downloading -> {

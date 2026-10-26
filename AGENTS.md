@@ -8,7 +8,12 @@
 > 1. 任何 AI Agent **严禁擅自执行** `git commit` 或 `git push` 操作！代码修改和本地验证完成后，**必须等待用户明确下达提交指令**（例如：“提交代码”、“推送到 GitHub”、“commit and push”）后，方可执行 Git 提交与远程推送。
 > 2. **提交后闭环跟踪**：推送到 GitHub 后，**必须主动跟踪 GitHub Actions 构建状态**（通过 GitHub API 查询执行结果）。若构建失败，必须立即分析 CI 日志、修复问题并重新提交推送，直到 GitHub Actions 构建完全成功并完成 Release 发布。
 > 3. **Debug 测试直播源规范**：在本地开发、功能自测或模拟器联调等 Debug 测试阶段，**统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源**，严禁使用非标准或未经验证的测试源。
-> 4. **编译自动安装与禁止模拟器测试纪律**：AI Agent 本地验证**只需执行 JVM 单元测试**（`./gradlew testDebugUnitTest`）与 APK 编译；编译完成后**直接通过 ADB 自动安装至模拟器并启动应用**（无需输出 APK 本地路径），**严禁自行在模拟器中进行交互测试**。在回复中主动提供测试订阅源链接，后续由用户亲自在模拟器中手动测试。
+> 4. **禁止 AI 署名（不得出现在 GitHub Contributors）**：任何 AI Agent 创建的提交、PR、Tag、Release **一律不得包含 AI 身份信息**，确保 GitHub 仓库 Contributors 列表中永远不出现 AI。具体要求：
+>    - 提交信息中**严禁**添加 `Co-Authored-By:`、`Signed-off-by:` 等指向 AI 的署名行（如 Claude、Anthropic、Copilot、GPT、Gemini、Cursor 等，以及 `noreply@anthropic.com` 等邮箱）；该规则**优先于** AI 工具自身默认的署名约定。
+>    - PR 描述、Release 说明中**严禁**添加「Generated with Claude Code」等 AI 生成标识。
+>    - **严禁**修改 `git config user.name / user.email`，或使用 `--author` 以 AI 身份提交；提交作者必须保持为用户本人配置的身份。
+>    - 推送前须用 `git log --format='%an <%ae>%n%b' origin/main..HEAD` 自检，发现 AI 署名必须先修正提交信息再推送。
+> 5. **编译自动安装与禁止模拟器测试纪律**：AI Agent 本地验证**只需执行 JVM 单元测试**（`./gradlew testDebugUnitTest`）与 APK 编译；编译完成后**直接通过 ADB 自动安装至模拟器并启动应用**（无需输出 APK 本地路径），**严禁自行在模拟器中进行交互测试**。在回复中主动提供测试订阅源链接，后续由用户亲自在模拟器中手动测试。
 
 ---
 
@@ -62,7 +67,7 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 ├── App.kt                              # Application 入口，标注 @HiltAndroidApp
 ├── MainActivity.kt                     # 单 Activity 宿主：全屏沉浸、按键总调度、Back 栈控制
 ├── di/
-│   └── AppModule.kt                    # Hilt 依赖注入模块（DB、DAO、Repo、Gson、UnsafeOkHttpClient）
+│   └── AppModule.kt                    # Hilt 依赖注入模块（DB、DAO、事务、Repo、Gson、标准/宽松 OkHttpClient）
 ├── player/
 │   └── TVPlayer.kt                     # ExoPlayer 封装（状态机、失败重试、自动切备用源）
 ├── parser/
@@ -77,13 +82,17 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 │   ├── repository/
 │   │   └── ChannelRepository.kt        # 数据仓储契约
 │   └── usecase/
-│       └── ParseAndImportM3UUseCase.kt # 解析并入库 UseCase
+│       ├── ParseAndImportM3UUseCase.kt # 解析并入库 UseCase
+│       └── ImportSubscriptionUseCase.kt # 在线订阅导入（保存订阅）与一键刷新
 ├── data/
 │   ├── local/
 │   │   ├── AppDatabase.kt              # Room 数据库定义 (version = 2)
+│   │   ├── TransactionRunner.kt        # 事务执行器（清空+写入等多步操作原子提交）
 │   │   ├── dao/ChannelDao.kt           # 频道数据库访问对象
 │   │   ├── dao/SourceDao.kt            # 订阅源访问对象
 │   │   └── entity/ChannelEntity.kt     # 频道实体持久化模型
+│   ├── remote/
+│   │   └── PlaylistFetcher.kt          # 在线 M3U 下载（宽松证书客户端）
 │   ├── preferences/
 │   │   └── AppPreferences.kt           # SharedPreferences 封装（频道记忆、初次启动标志）
 │   └── repository/
@@ -91,7 +100,11 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 │       └── DefaultChannels.kt          # 默认内置频道列表
 └── ui/
     ├── player/
-    │   ├── PlayerFragment.kt           # 播放器核心界面（全屏播放、抽屉选台、快捷面板、手势）
+    │   ├── PlayerFragment.kt           # 播放器宿主（播放状态渲染、按键路由）
+    │   ├── CategoryDrawer.kt           # 底部选台抽屉（子 View 复用）
+    │   ├── IconPanel.kt                # 右侧快捷面板（焦点与按键）
+    │   ├── ChannelMenuDialogs.kt       # 频道操作菜单
+    │   ├── PlayerGestures.kt           # 触屏手势
     │   └── PlayerViewModel.kt          # UI 状态机（navStack、频道换台、分类切换、收藏）
     └── settings/
         ├── SettingsFragment.kt         # 设置中心页面
@@ -115,6 +128,10 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 ## 4. 页面层级与导航状态机 (`navStack`)
 
 页面采用单向栈管理：`PlayerViewModel.state.value.navStack: List<Page>`。
+
+- **navStack 是唯一导航状态来源**：任何页面跳转只调用 `PlayerViewModel.pushPage()/popPage()`，严禁直接操作 FragmentManager。`MainActivity.syncFragmentPages()` 观察 navStack 自动挂载/移除 SETTINGS、SOURCE_MGMT、UPDATE 对应的 Fragment。
+- **返回键统一入口**：遥控器返回、Esc、手势返回（含 Android 16 预测性返回）与触屏返回按钮全部经 `OnBackPressedDispatcher` → `PlayerViewModel.onBack()` 处理，Fragment 内不得再处理 KEYCODE_BACK。
+- `pushPage` 规则：已在栈中的页面回退到该页（不重复叠加）；ICON / CATEGORY 互斥，始终位于第 2 层。
 
 ### 4.1 层级架构表
 
@@ -272,5 +289,7 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 7. [ ] **推送后是否主动跟踪 GitHub Actions 直至成功？**
    - 提交推送后，必须主动查询 GitHub API 检查 Actions 运行状态。
    - 若 Actions 失败，必须定位报错原因、继续修改并再次提交流程，直至 GitHub Actions 构建完全成功并完成 Release 发布。
-8. [ ] **Debug 测试直播源标准**：
+8. [ ] **提交中是否完全没有 AI 署名？**
+   - 提交信息、PR、Release 中不含任何 `Co-Authored-By` AI 署名或 AI 生成标识，提交作者为用户本人身份，GitHub Contributors 中不得出现 AI。
+9. [ ] **Debug 测试直播源标准**：
    - 测试验证统一使用 `https://peterhchina.github.io/iptv/CNTV-V4.m3u` 作为测试直播源。

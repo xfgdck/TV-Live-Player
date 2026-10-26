@@ -18,12 +18,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import javax.inject.Inject
-import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
 class UpdateRepositoryImpl @Inject constructor(
-    @param:Named("unsafeOkHttpClient") private val okHttpClient: OkHttpClient,
+    private val okHttpClient: OkHttpClient,
     private val gson: Gson
 ) : UpdateRepository {
 
@@ -50,15 +49,14 @@ class UpdateRepositoryImpl @Inject constructor(
                 .header("User-Agent", "TV-Live-Player")
                 .build()
 
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(
-                    IOException("检查更新请求失败 (HTTP ${response.code})")
-                )
-            }
-
-            val bodyString = response.body?.string()
-                ?: return@withContext Result.failure(IOException("响应内容为空"))
+            val bodyString = okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext Result.failure(
+                        IOException("检查更新请求失败 (HTTP ${response.code})")
+                    )
+                }
+                response.body?.string()
+            } ?: return@withContext Result.failure(IOException("响应内容为空"))
 
             val releaseDto = gson.fromJson(bodyString, GitHubReleaseDto::class.java)
                 ?: return@withContext Result.failure(IOException("无法解析发布信息"))
@@ -98,7 +96,7 @@ class UpdateRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun downloadApk(downloadUrl: String, destinationFile: File): Flow<DownloadState> = flow {
+    override fun downloadApk(downloadUrl: String, destinationFile: File, expectedSize: Long): Flow<DownloadState> = flow {
         emit(DownloadState.Downloading(0L, 0L, 0))
 
         val tempFile = File(destinationFile.parentFile, "${destinationFile.name}.tmp")
@@ -125,6 +123,7 @@ class UpdateRepositoryImpl @Inject constructor(
 
                 val response = downloadHttpClient.newCall(request).execute()
                 if (!response.isSuccessful) {
+                    response.close()
                     lastError = IOException("下载响应异常 (HTTP ${response.code})")
                     continue
                 }
@@ -165,6 +164,11 @@ class UpdateRepositoryImpl @Inject constructor(
                     }
                 }
 
+                if (expectedSize > 0 && tempFile.length() != expectedSize) {
+                    // 镜像或网络异常导致内容不完整/被篡改时，大小与 GitHub 发布记录不一致
+                    lastError = IOException("安装包大小校验失败")
+                    continue
+                }
                 if (tempFile.exists() && tempFile.length() > 0) {
                     downloadSuccess = true
                     break
