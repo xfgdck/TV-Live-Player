@@ -16,6 +16,9 @@ interface SourceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(source: SourceEntity)
 
+    @Query("DELETE FROM sources WHERE id = :id")
+    suspend fun delete(id: String)
+
     @Query("DELETE FROM sources")
     suspend fun deleteAll()
 }

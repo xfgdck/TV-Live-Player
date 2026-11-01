@@ -1,5 +1,6 @@
 package top.xiaofeigun.tvliveplayer.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import top.xiaofeigun.tvliveplayer.domain.model.Source
@@ -11,14 +12,22 @@ data class SourceEntity(
     val name: String,
     val url: String,
     val isActive: Int = 1,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
+    val lastUpdated: Long = 0L,
+    @ColumnInfo(defaultValue = "0")
+    val channelCount: Int = 0,
+    val lastError: String? = null
 ) {
     fun toDomainModel(): Source = Source(
         id = id,
         name = name,
         url = url,
         isActive = isActive == 1,
-        createdAt = createdAt
+        createdAt = createdAt,
+        lastUpdated = lastUpdated,
+        channelCount = channelCount,
+        lastError = lastError
     )
 
     companion object {
@@ -27,7 +36,10 @@ data class SourceEntity(
             name = source.name,
             url = source.url,
             isActive = if (source.isActive) 1 else 0,
-            createdAt = source.createdAt
+            createdAt = source.createdAt,
+            lastUpdated = source.lastUpdated,
+            channelCount = source.channelCount,
+            lastError = source.lastError
         )
     }
 }

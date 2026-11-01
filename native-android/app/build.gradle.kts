@@ -74,6 +74,11 @@ android {
     }
 }
 
+ksp {
+    // 导出数据库结构，供编写与校验后续版本的 Migration
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Core
     implementation("androidx.core:core-ktx:1.18.0")
@@ -84,6 +89,8 @@ dependencies {
     // Media3 ExoPlayer
     implementation("androidx.media3:media3-exoplayer:1.10.0")
     implementation("androidx.media3:media3-exoplayer-hls:1.10.0")
+    implementation("androidx.media3:media3-exoplayer-dash:1.10.0")
+    implementation("androidx.media3:media3-exoplayer-rtsp:1.10.0")
     implementation("androidx.media3:media3-datasource-okhttp:1.10.0")
     implementation("androidx.media3:media3-ui:1.10.0")
 

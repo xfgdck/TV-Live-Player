@@ -5,13 +5,13 @@ import androidx.lifecycle.viewModelScope
 import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
 import top.xiaofeigun.tvliveplayer.domain.model.Channel
 import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
+import top.xiaofeigun.tvliveplayer.domain.usecase.PrepareChannelDataUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -55,7 +55,8 @@ data class PlayerUiState(
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: ChannelRepository,
-    private val appPreferences: AppPreferences
+    private val appPreferences: AppPreferences,
+    private val prepareChannelData: PrepareChannelDataUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PlayerUiState())
@@ -74,9 +75,9 @@ class PlayerViewModel @Inject constructor(
 
     private fun observeChannels() {
         viewModelScope.launch {
+            prepareChannelData()
             repository.getAllChannels().collect { list ->
-                val cats = repository.getAllCategoriesWithFavorite().first()
-                onChannelsChanged(list, cats)
+                onChannelsChanged(list, ChannelRepository.categoriesOf(list))
             }
         }
     }
@@ -230,14 +231,13 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { repository.toggleFavorite(channelId) }
     }
 
-    fun deleteCategoryChannel(index: Int) {
-        val ch = _state.value.categoryChannels.getOrNull(index) ?: return
-        viewModelScope.launch { repository.deleteChannel(ch) }
+    /** 频道操作一律按 id，菜单弹出期间列表变化也不会作用到其它频道 */
+    fun deleteChannel(channelId: String) {
+        viewModelScope.launch { repository.deleteChannel(channelId) }
     }
 
-    fun moveCategoryChannel(index: Int, targetCategory: String) {
-        val ch = _state.value.categoryChannels.getOrNull(index) ?: return
-        viewModelScope.launch { repository.updateChannel(ch.copy(category = targetCategory)) }
+    fun moveChannel(channelId: String, targetCategory: String) {
+        viewModelScope.launch { repository.moveChannel(channelId, targetCategory) }
     }
 
     fun mergeCategory(from: String, to: String) {

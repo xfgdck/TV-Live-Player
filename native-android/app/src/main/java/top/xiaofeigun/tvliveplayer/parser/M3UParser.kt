@@ -1,6 +1,8 @@
 package top.xiaofeigun.tvliveplayer.parser
 
+import com.google.gson.JsonParser
 import top.xiaofeigun.tvliveplayer.domain.model.Channel
+import top.xiaofeigun.tvliveplayer.domain.model.StreamUrl
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,6 +40,10 @@ class M3UParser @Inject constructor() {
     private fun parseM3u(content: String, sourceCategory: String? = null): List<Channel> {
         val channels = mutableListOf<Channel>()
         val lines = content.lines()
+        // #EXTM3U 行上的 http-user-agent / http-referrer 作为全部频道的默认请求头
+        val playlistHeaders = lines.firstOrNull { it.trim().startsWith("#EXTM3U", ignoreCase = true) }
+            ?.let { headerAttributes(parseAttributes(it)) }
+            .orEmpty()
         var i = 0
 
         while (i < lines.size) {
@@ -48,6 +54,7 @@ class M3UParser @Inject constructor() {
                 val logo = attrs["tvg-logo"] ?: attrs["logo"]
                 val tvgId = attrs["tvg-id"]
                 val tvgName = attrs["tvg-name"]
+                val entryHeaders = LinkedHashMap(playlistHeaders).apply { putAll(headerAttributes(attrs)) }
 
                 // Channel name is after the first comma outside quoted attribute values
                 val commaIdx = indexOfUnquotedComma(line)
@@ -77,27 +84,35 @@ class M3UParser @Inject constructor() {
                         continue
                     }
 
+                    if (nextLine.startsWith("#EXTVLCOPT:", ignoreCase = true)) {
+                        parseVlcOpt(nextLine)?.let { (k, v) -> entryHeaders[k] = v }
+                        continue
+                    }
+
+                    if (nextLine.startsWith("#EXTHTTP:", ignoreCase = true)) {
+                        entryHeaders.putAll(parseExtHttp(nextLine))
+                        continue
+                    }
+
                     if (nextLine.startsWith("#")) {
                         // Skip other comment/directive lines
                         continue
                     }
 
-                    // Found URL line
-                    val cleanedUrl = cleanUrl(nextLine)
-                    if (cleanedUrl.isNotEmpty()) {
-                        channelUrls.add(cleanedUrl)
-                    }
+                    // Found URL line（请求头指令可能出现在 URL 之后，统一在条目结束后附加）
+                    channelUrls.add(nextLine)
                 }
+                val cleanedUrls = channelUrls.map { cleanUrl(it, entryHeaders) }.filter { it.isNotEmpty() }
 
                 val finalCategory = normalizeCategory(category ?: sourceCategory ?: "未分类")
 
-                if (channelUrls.isNotEmpty()) {
+                if (cleanedUrls.isNotEmpty()) {
                     channels.add(
                         Channel(
                             id = UUID.randomUUID().toString(),
                             name = cleanChannelName(name),
-                            url = channelUrls.first(),
-                            backupUrls = channelUrls.drop(1),
+                            url = cleanedUrls.first(),
+                            backupUrls = cleanedUrls.drop(1),
                             category = finalCategory,
                             logo = logo?.ifEmpty { null },
                             tvgId = tvgId?.ifEmpty { null },
@@ -241,29 +256,37 @@ class M3UParser @Inject constructor() {
         return map
     }
 
-    private fun cleanUrl(raw: String): String {
-        var url = raw.trim().removeSurrounding("\"", "\"").removeSurrounding("'", "'").trim()
-        // Handle pipe parameters: http://host/live.m3u8|User-Agent=...
-        if (url.contains("|")) {
-            val beforePipe = url.substringBefore("|").trim()
-            if (isValidProtocol(beforePipe)) {
-                url = beforePipe
-            }
-        }
-        return if (isValidProtocol(url)) url else ""
+    /**
+     * 规范化播放地址：保留 `url|User-Agent=...` 形式的请求头，并合并条目级请求头（地址自带的优先）。
+     * 播放器不支持的协议（rtmp / rtp / p2p / mms / mitv 等）直接丢弃，避免备用源轮换时白等。
+     */
+    private fun cleanUrl(raw: String, headers: Map<String, String> = emptyMap()): String {
+        val stream = StreamUrl.parse(raw.trim().removeSurrounding("\"", "\"").removeSurrounding("'", "'"))
+        if (!StreamUrl.isPlayable(stream.url)) return ""
+        val merged = (headers + stream.headers).filter { (k, v) -> StreamUrl.isValidHeader(k, v) }
+        return stream.copy(headers = merged).encode()
     }
 
-    private fun isValidProtocol(url: String): Boolean {
-        val lower = url.lowercase()
-        return lower.startsWith("http://") ||
-                lower.startsWith("https://") ||
-                lower.startsWith("rtmp://") ||
-                lower.startsWith("rtsp://") ||
-                lower.startsWith("udp://") ||
-                lower.startsWith("rtp://") ||
-                lower.startsWith("p2p://") ||
-                lower.startsWith("mms://") ||
-                lower.startsWith("mitv://")
+    private fun headerAttributes(attrs: Map<String, String>): Map<String, String> =
+        attrs.filterKeys { it in HEADER_ATTRIBUTES }.mapKeys { StreamUrl.headerName(it.key) }
+
+    /** `#EXTVLCOPT:http-user-agent=xxx` / `#EXTVLCOPT:http-referrer=xxx`，其余 VLC 选项忽略 */
+    private fun parseVlcOpt(line: String): Pair<String, String>? {
+        val opt = line.substringAfter(":")
+        val name = StreamUrl.headerName(opt.substringBefore("="))
+        val value = opt.substringAfter("=", "").trim().removeSurrounding("\"", "\"")
+        if (value.isEmpty() || (name != StreamUrl.USER_AGENT && name != StreamUrl.REFERER)) return null
+        return name to value
+    }
+
+    /** `#EXTHTTP:{"User-Agent":"xxx","Referer":"yyy"}` */
+    private fun parseExtHttp(line: String): Map<String, String> = try {
+        JsonParser.parseString(line.substringAfter(":")).asJsonObject.entrySet()
+            .filter { it.value.isJsonPrimitive }
+            .associate { StreamUrl.headerName(it.key) to it.value.asString }
+            .filter { it.key.isNotEmpty() && it.value.isNotBlank() }
+    } catch (_: Exception) {
+        emptyMap()
     }
 
     private fun cleanChannelName(raw: String): String {
@@ -306,6 +329,10 @@ class M3UParser @Inject constructor() {
     }
 
     companion object {
+        private val HEADER_ATTRIBUTES = setOf(
+            "http-user-agent", "user-agent", "http-referrer", "http-referer", "referrer", "referer"
+        )
+
         /**
          * Cleans category syntax wrappers (brackets, quotes, spaces) while 100% respecting
          * and preserving the original category name specified in the source.

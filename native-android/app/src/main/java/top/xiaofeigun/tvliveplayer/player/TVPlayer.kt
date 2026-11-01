@@ -2,6 +2,7 @@ package top.xiaofeigun.tvliveplayer.player
 
 import android.content.Context
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.C
@@ -10,13 +11,18 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.OkHttpClient
+import top.xiaofeigun.tvliveplayer.domain.model.StreamUrl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,21 +45,36 @@ class TVPlayer @Inject constructor(
     private var _exoPlayer: ExoPlayer? = null
     val player: ExoPlayer? get() = _exoPlayer
 
-    /** 拉流使用系统标准 SSL 校验（见 AGENTS.md 6.4） */
-    private val dataSourceFactory: DataSource.Factory by lazy {
-        val okHttpClient = OkHttpClient.Builder()
+    /**
+     * 拉流使用系统标准 SSL 校验（见 AGENTS.md 6.4）。
+     * 未指定 User-Agent 的地址使用默认 UA；地址自带的请求头（见 [StreamUrl]）优先。
+     */
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .addInterceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .header("User-Agent", USER_AGENT)
-                    .build()
-                chain.proceed(request)
+                val request = chain.request()
+                if (request.header(StreamUrl.USER_AGENT) != null) {
+                    chain.proceed(request)
+                } else {
+                    chain.proceed(request.newBuilder().header(StreamUrl.USER_AGENT, USER_AGENT).build())
+                }
             }
             .build()
-        OkHttpDataSource.Factory(okHttpClient)
+    }
+
+    /** DefaultDataSource 按协议分发：http(s) 交给 OkHttp（携带该地址的请求头），udp:// 组播交给内置 UdpDataSource */
+    private fun dataSourceFactory(headers: Map<String, String>): DataSource.Factory =
+        DefaultDataSource.Factory(context, OkHttpDataSource.Factory(okHttpClient).setDefaultRequestProperties(headers))
+
+    /** Wi-Fi 下接收组播需持有 MulticastLock，否则多数设备会丢弃组播包 */
+    private val multicastLock: WifiManager.MulticastLock? by lazy {
+        (context.getSystemService(Context.WIFI_SERVICE) as? WifiManager)
+            ?.createMulticastLock("TVPlayer")
+            ?.apply { setReferenceCounted(false) }
     }
 
     private val _playbackState = MutableStateFlow(PlaybackState.IDLE)
@@ -70,7 +91,9 @@ class TVPlayer @Inject constructor(
 
     fun initialize() {
         if (_exoPlayer != null) return
-        _exoPlayer = ExoPlayer.Builder(context).build()
+        // 部分盒子硬解初始化失败时自动回退到其它解码器
+        val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+        _exoPlayer = ExoPlayer.Builder(context, renderersFactory).build()
             .also { player ->
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
@@ -127,22 +150,41 @@ class TVPlayer @Inject constructor(
         }
     }
 
-    fun playUrls(urls: List<String>, startIndex: Int = 0) {
-        urlList = urls
-        urlIndex = startIndex.coerceIn(0, (urls.size - 1).coerceAtLeast(0))
+    fun playUrls(urls: List<String>) {
+        // 兼容旧版本入库的 rtmp / p2p 等不支持协议，避免逐个失败白等
+        urlList = urls.filter(StreamUrl::isPlayable)
+        urlIndex = 0
         retryRound = 0
         retryHandler.removeCallbacksAndMessages(null)
-        if (urls.isEmpty()) {
-            _playbackState.value = PlaybackState.IDLE
-            _errorMessage.value = null
+        if (urlList.isEmpty()) {
+            if (urls.isEmpty()) {
+                _playbackState.value = PlaybackState.IDLE
+                _errorMessage.value = null
+            } else {
+                _playbackState.value = PlaybackState.ERROR
+                _errorMessage.value = "该频道的播放地址协议暂不支持"
+            }
             return
         }
         _playbackState.value = PlaybackState.BUFFERING
         playCurrent()
     }
 
+    /** 同一频道的地址列表变化（如刷新订阅）：当前地址仍在则无缝沿用；已被移除或已全部失败时按新列表重新播放 */
+    fun updateUrls(urls: List<String>) {
+        val playable = urls.filter(StreamUrl::isPlayable)
+        val index = urlList.getOrNull(urlIndex)?.let { playable.indexOf(it) } ?: -1
+        if (index < 0 || _playbackState.value == PlaybackState.ERROR) {
+            playUrls(urls)
+        } else {
+            urlList = playable
+            urlIndex = index
+        }
+    }
+
     private fun playCurrent() {
         val url = urlList.getOrNull(urlIndex) ?: return
+        if (url.startsWith("udp://", ignoreCase = true)) multicastLock?.acquire() else multicastLock?.release()
         _exoPlayer?.apply {
             setMediaSource(createMediaSource(url))
             prepare()
@@ -151,12 +193,21 @@ class TVPlayer @Inject constructor(
         _errorMessage.value = null
     }
 
-    private fun createMediaSource(url: String): MediaSource {
+    private fun createMediaSource(raw: String): MediaSource {
+        val stream = StreamUrl.parse(raw)
+        val url = stream.url
         val item = MediaItem.fromUri(url)
-        return if (isHls(url)) {
-            HlsMediaSource.Factory(dataSourceFactory).createMediaSource(item)
-        } else {
-            ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(item)
+        return when {
+            // RTSP 自带 RTP 传输层，不经过 DataSource；UDP 不通时自动回退 TCP
+            url.startsWith("rtsp://", ignoreCase = true) ->
+                RtspMediaSource.Factory()
+                    .setUserAgent(stream.headers[StreamUrl.USER_AGENT] ?: USER_AGENT)
+                    .createMediaSource(item)
+            isHls(url) -> HlsMediaSource.Factory(dataSourceFactory(stream.headers)).createMediaSource(item)
+            Util.inferContentType(Uri.parse(url)) == C.CONTENT_TYPE_DASH ->
+                DashMediaSource.Factory(dataSourceFactory(stream.headers)).createMediaSource(item)
+            // http(s) 下的 FLV / TS / MP4 等，以及 udp:// 组播 TS
+            else -> ProgressiveMediaSource.Factory(dataSourceFactory(stream.headers)).createMediaSource(item)
         }
     }
 
@@ -165,6 +216,22 @@ class TVPlayer @Inject constructor(
         if (Util.inferContentType(Uri.parse(url)) == C.CONTENT_TYPE_HLS) return true
         val lower = url.lowercase()
         return HLS_HINTS.any { lower.contains(it) }
+    }
+
+    /** 应用退到后台：停止拉流并释放网络与解码资源，保留当前频道与正在使用的源 */
+    fun stop() {
+        retryHandler.removeCallbacksAndMessages(null)
+        multicastLock?.release()
+        _exoPlayer?.stop()
+        _errorMessage.value = null
+    }
+
+    /** 回到前台：从当前源重新拉流，直接回到直播点，避免播放后台期间的陈旧缓冲 */
+    fun restart() {
+        if (urlList.isEmpty()) return
+        retryRound = 0
+        _playbackState.value = PlaybackState.BUFFERING
+        playCurrent()
     }
 
     fun pause() {
@@ -179,6 +246,7 @@ class TVPlayer @Inject constructor(
 
     fun release() {
         retryHandler.removeCallbacksAndMessages(null)
+        multicastLock?.release()
         _exoPlayer?.release()
         _exoPlayer = null
         urlList = emptyList()

@@ -5,6 +5,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import top.xiaofeigun.tvliveplayer.domain.model.StreamUrl
 
 class M3UParserTest {
 
@@ -93,7 +94,61 @@ class M3UParserTest {
 
         val channels = parser.parse(content)
         assertEquals(1, channels.size)
-        assertEquals("http://example.com/cctv1.m3u8", channels[0].url)
+        assertEquals("http://example.com/cctv1.m3u8|User-Agent=okhttp", channels[0].url)
+    }
+
+    @Test
+    fun testM3uRequestHeaders() {
+        val content = """
+            #EXTM3U http-user-agent="GlobalUA"
+            #EXTINF:-1 http-referrer="https://a.com/",频道A
+            #EXTVLCOPT:http-user-agent=Mozilla/5.0 (Linux; Android 10)
+            #EXTVLCOPT:network-caching=1000
+            http://example.com/a.m3u8
+            #EXTINF:-1,频道B
+            #EXTHTTP:{"Referer":"https://b.com/","Origin":"https://b.com"}
+            http://example.com/b.m3u8|User-Agent=Own%20UA
+            #EXTINF:-1,频道C
+            http://example.com/c.m3u8
+        """.trimIndent()
+        val byName = parser.parse(content).associateBy { it.name }
+
+        val a = StreamUrl.parse(byName.getValue("频道A").url)
+        assertEquals("http://example.com/a.m3u8", a.url)
+        assertEquals(
+            mapOf("User-Agent" to "Mozilla/5.0 (Linux; Android 10)", "Referer" to "https://a.com/"),
+            a.headers
+        )
+
+        // 地址自带的请求头优先于条目与播放列表级请求头
+        val b = StreamUrl.parse(byName.getValue("频道B").url)
+        assertEquals(
+            mapOf("User-Agent" to "Own UA", "Referer" to "https://b.com/", "Origin" to "https://b.com"),
+            b.headers
+        )
+
+        assertEquals(mapOf("User-Agent" to "GlobalUA"), StreamUrl.parse(byName.getValue("频道C").url).headers)
+    }
+
+    @Test
+    fun testInvalidHeadersAreDropped() {
+        val content = """
+            #EXTINF:-1 http-referrer="https://例子.com/",频道A
+            #EXTHTTP:{"Bad Name":"x","Origin":"https://ok.com"}
+            http://example.com/a.m3u8|User-Agent=中文UA
+        """.trimIndent()
+        val stream = StreamUrl.parse(parser.parse(content).single().url)
+        assertEquals("http://example.com/a.m3u8", stream.url)
+        assertEquals(mapOf("Origin" to "https://ok.com"), stream.headers)
+        // 播放时解析旧数据同样过滤
+        assertTrue(StreamUrl.parse("http://x|Referer=https://例子.com/").headers.isEmpty())
+    }
+
+    @Test
+    fun testStreamUrlRoundTrip() {
+        val stream = StreamUrl("http://x.com/live.m3u8", mapOf("User-Agent" to "a&b|c 100%+", "Referer" to "http://r/"))
+        assertEquals(stream, StreamUrl.parse(stream.encode()))
+        assertEquals("http://x.com/live.m3u8", StreamUrl("http://x.com/live.m3u8").encode())
     }
 
     @Test
@@ -223,5 +278,38 @@ class M3UParserTest {
         val ch = parser.parse(content).single()
         assertEquals("CCTV-13 新闻", ch.name)
         assertEquals("新闻,资讯", ch.category)
+    }
+
+    @Test
+    fun testUnsupportedProtocolsAreDropped() {
+        val content = """
+            #EXTM3U
+            #EXTINF:-1,CCTV-1
+            rtmp://example.com/live/cctv1
+            rtsp://example.com/cctv1
+            udp://239.0.0.1:5000
+            #EXTINF:-1,P2P 频道
+            p2p://example.com/abc
+            mitv://example.com/def
+        """.trimIndent()
+        val ch = parser.parse(content).single()
+        assertEquals("rtsp://example.com/cctv1", ch.url)
+        assertEquals(listOf("udp://239.0.0.1:5000"), ch.backupUrls)
+    }
+
+    @Test
+    fun testTxtUnsupportedProtocolsAreDropped() {
+        val content = "央视,#genre#\nCCTV-1,rtp://239.0.0.1:5000#http://example.com/cctv1.m3u8\nCCTV-2,mms://example.com/cctv2"
+        val ch = parser.parse(content).single()
+        assertEquals("http://example.com/cctv1.m3u8", ch.url)
+        assertTrue(ch.backupUrls.isEmpty())
+    }
+
+    @Test
+    fun testIsPlayableUrl() {
+        assertTrue(StreamUrl.isPlayable("HTTPS://example.com/a.m3u8"))
+        assertTrue(StreamUrl.isPlayable("udp://239.0.0.1:5000"))
+        assertTrue(!StreamUrl.isPlayable("rtmp://example.com/live"))
+        assertTrue(!StreamUrl.isPlayable("rtp://239.0.0.1:5000"))
     }
 }

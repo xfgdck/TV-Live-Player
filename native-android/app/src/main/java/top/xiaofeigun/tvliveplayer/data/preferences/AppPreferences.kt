@@ -29,8 +29,18 @@ open class AppPreferences @Inject constructor(
         prefs?.edit()?.putBoolean(KEY_FIRST_LAUNCH, false)?.apply()
     }
 
+    /** 启动时是否自动更新过期订阅，默认关闭 */
+    open fun isAutoRefreshEnabled(): Boolean {
+        return prefs?.getBoolean(KEY_AUTO_REFRESH, false) ?: false
+    }
+
+    open fun setAutoRefreshEnabled(enabled: Boolean) {
+        prefs?.edit()?.putBoolean(KEY_AUTO_REFRESH, enabled)?.apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "tv_live_player_prefs"
+        private const val KEY_AUTO_REFRESH = "auto_refresh_subscriptions"
         private const val KEY_LAST_CHANNEL_ID = "last_channel_id"
         private const val KEY_FIRST_LAUNCH = "first_launch"
     }

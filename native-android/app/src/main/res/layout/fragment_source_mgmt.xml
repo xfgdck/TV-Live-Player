@@ -3,76 +3,106 @@
     android:layout_height="match_parent"
     android:background="@color/background">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="500dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@color/surface"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:fillViewport="false">
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:padding="8dp"
-            android:text="直播源管理"
-            android:textColor="@color/accent"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:background="@color/surface"
+            android:orientation="vertical"
+            android:padding="24dp">
 
-        <TextView
-            android:id="@+id/btn_qr_scan"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center"
-            android:text="扫码添加（需连同一WiFi）"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:focusable="true"
-            android:clickable="true" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="8dp"
+                android:text="直播源管理"
+                android:textColor="@color/accent"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/btn_url"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center"
-            android:text="从 URL 导入"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:focusable="true"
-            android:clickable="true" />
+            <TextView
+                android:id="@+id/btn_qr_scan"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/menu_item_bg"
+                android:gravity="center"
+                android:text="扫码添加（需连同一WiFi）"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:focusable="true"
+                android:clickable="true" />
 
-        <TextView
-            android:id="@+id/btn_refresh"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center"
-            android:text="更新订阅源"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:focusable="true"
-            android:clickable="true" />
+            <TextView
+                android:id="@+id/btn_url"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/menu_item_bg"
+                android:gravity="center"
+                android:text="从 URL 导入"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:focusable="true"
+                android:clickable="true" />
 
-        <TextView
-            android:id="@+id/btn_clear"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/menu_item_bg"
-            android:gravity="center"
-            android:text="清空节目单与订阅"
-            android:textColor="@color/error_color"
-            android:textSize="16sp"
-            android:focusable="true"
-            android:clickable="true" />
+            <TextView
+                android:id="@+id/btn_auto_refresh"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/menu_item_bg"
+                android:gravity="center"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:focusable="true"
+                android:clickable="true" />
 
-    </LinearLayout>
+            <TextView
+                android:id="@+id/tv_source_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="已保存的订阅"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tv_source_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="暂无订阅。通过扫码或 URL 导入的在线直播源会显示在这里，可单独更新、重命名或删除。"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/source_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/btn_clear"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/menu_item_bg"
+                android:gravity="center"
+                android:text="清空节目单与订阅"
+                android:textColor="@color/error_color"
+                android:textSize="16sp"
+                android:focusable="true"
+                android:clickable="true" />
+
+        </LinearLayout>
+
+    </ScrollView>
 
 </FrameLayout>

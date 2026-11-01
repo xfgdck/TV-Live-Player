@@ -21,10 +21,6 @@ interface ChannelDao {
     @Query("SELECT * FROM channels WHERE favorite = 1 ORDER BY sortOrder ASC")
     fun getFavoriteChannels(): Flow<List<ChannelEntity>>
 
-    /** 分类按其首个频道在源中的出现顺序排列，保留直播源原始分组顺序 */
-    @Query("SELECT category FROM channels GROUP BY category ORDER BY MIN(sortOrder) ASC")
-    fun getCategories(): Flow<List<String>>
-
     @Query("SELECT * FROM channels WHERE id = :id")
     suspend fun getChannelById(id: String): ChannelEntity?
 
@@ -38,13 +34,19 @@ interface ChannelDao {
     suspend fun insertAll(channels: List<ChannelEntity>)
 
     @Update
-    suspend fun update(channel: ChannelEntity)
-
-    @Update
     suspend fun updateAll(channels: List<ChannelEntity>)
 
+    @Query("DELETE FROM channels WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("UPDATE channels SET category = :category WHERE id = :id")
+    suspend fun updateCategory(id: String, category: String)
+
+    @Query("UPDATE channels SET favorite = :favorite WHERE id = :id")
+    suspend fun updateFavorite(id: String, favorite: Int)
+
     @Delete
-    suspend fun delete(channel: ChannelEntity)
+    suspend fun deleteChannels(channels: List<ChannelEntity>)
 
     @Query("DELETE FROM channels")
     suspend fun deleteAll()

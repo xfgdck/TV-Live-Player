@@ -5,5 +5,4 @@
     <string name="retry">重试</string>
     <string name="welcome">欢迎使用电视直播</string>
     <string name="exit_confirm">再按一次返回键退出</string>
-    <string name="refresh_sources">更新订阅源（%1$d 个）</string>
 </resources>

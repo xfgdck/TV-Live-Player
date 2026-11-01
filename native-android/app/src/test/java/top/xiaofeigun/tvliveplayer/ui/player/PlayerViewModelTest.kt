@@ -3,6 +3,7 @@ package top.xiaofeigun.tvliveplayer.ui.player
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -16,7 +17,9 @@ import org.junit.Test
 import top.xiaofeigun.tvliveplayer.data.local.entity.ChannelEntity
 import top.xiaofeigun.tvliveplayer.data.repository.ChannelRepositoryImpl
 import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
+import top.xiaofeigun.tvliveplayer.domain.usecase.PrepareChannelDataUseCase
 import top.xiaofeigun.tvliveplayer.testutil.FakeAppPreferences
+import top.xiaofeigun.tvliveplayer.testutil.FakeChannelBackupHelper
 import top.xiaofeigun.tvliveplayer.testutil.FakeChannelDao
 import top.xiaofeigun.tvliveplayer.testutil.FakeSourceDao
 import top.xiaofeigun.tvliveplayer.testutil.ImmediateTransactionRunner
@@ -47,7 +50,9 @@ class PlayerViewModelTest {
         )
 
         fakePrefs = FakeAppPreferences()
-        viewModel = PlayerViewModel(repository, fakePrefs)
+        viewModel = PlayerViewModel(
+            repository, fakePrefs, PrepareChannelDataUseCase(repository, fakePrefs, FakeChannelBackupHelper())
+        )
     }
 
     @After
@@ -179,6 +184,28 @@ class PlayerViewModelTest {
         assertFalse(viewModel.onBack())
         assertTrue(viewModel.state.value.showExitConfirm)
         assertTrue(viewModel.onBack())
+    }
+
+    @Test
+    fun testRestoreFromBackupKeepsLastChannelAndSkipsEmptyState() = runTest(testDispatcher) {
+        // 用当前数据生成快照，再模拟覆盖更新后数据库为空
+        val seededRepo = ChannelRepositoryImpl(fakeDao, FakeSourceDao(), com.google.gson.Gson(), ImmediateTransactionRunner)
+        val snapshot = seededRepo.exportData()
+        val emptyDao = FakeChannelDao()
+        val repository = ChannelRepositoryImpl(emptyDao, FakeSourceDao(), com.google.gson.Gson(), ImmediateTransactionRunner)
+        val prefs = FakeAppPreferences(lastChannelId = "hnws")
+        val vm = PlayerViewModel(
+            repository, prefs, PrepareChannelDataUseCase(repository, prefs, FakeChannelBackupHelper(snapshot))
+        )
+
+        val seenEmptyLoaded = mutableListOf<Boolean>()
+        val job = launch { vm.state.collect { seenEmptyLoaded += it.channelsLoaded && it.channels.isEmpty() } }
+        advanceUntilIdle()
+        job.cancel()
+
+        assertFalse("恢复完成前不应出现「已加载但无频道」状态", seenEmptyLoaded.any { it })
+        assertEquals(5, vm.state.value.channels.size)
+        assertEquals("hnws", vm.state.value.currentChannel?.id)
     }
 
     @Test

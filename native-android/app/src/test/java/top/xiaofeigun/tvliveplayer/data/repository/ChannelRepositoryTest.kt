@@ -112,6 +112,80 @@ class ChannelRepositoryTest {
         assertEquals("http://new.com/live.m3u8", cctv2.backupUrls)
     }
 
+    @Test
+    fun testRefreshPrunesStaleSubscriptionUrls() = runBlocking {
+        repository.addChannels(
+            listOf(
+                Channel(id = "c1", name = "CCTV-1", url = "http://s1/old", backupUrls = listOf("http://s1/keep"), category = "央视"),
+                Channel(id = "c2", name = "CCTV-2", url = "http://s1/cctv2", category = "央视"),
+                Channel(id = "x", name = "CCTV-3", url = "http://s1/cctv3", category = "央视")
+            ),
+            sourceId = "s1"
+        )
+        // 手动导入与其它订阅的地址不受 s1 刷新影响
+        repository.addChannels(listOf(Channel(id = "m", name = "CCTV-1", url = "http://manual/cctv1", category = "央视")))
+        repository.addChannels(listOf(Channel(id = "o", name = "CCTV-2", url = "http://s2/cctv2", category = "央视")), sourceId = "s2")
+        repository.toggleFavorite("c1")
+
+        // s1 刷新：CCTV-1 只剩 keep + 新地址，CCTV-2 与 CCTV-3 已从订阅中消失
+        repository.addChannels(
+            listOf(Channel(id = "n1", name = "CCTV-1", url = "http://s1/keep", backupUrls = listOf("http://s1/new"), category = "央视")),
+            sourceId = "s1"
+        )
+
+        val byName = fakeChannelDao.channels.associateBy { it.name }
+        val cctv1 = byName.getValue("CCTV-1")
+        assertEquals(listOf("http://s1/keep", "http://manual/cctv1", "http://s1/new"), cctv1.allUrls())
+        assertEquals(1, cctv1.favorite)
+        assertEquals(
+            mapOf("http://s1/keep" to "s1", "http://s1/new" to "s1"),
+            ChannelEntity.decodeUrlSources(cctv1.urlSources)
+        )
+        // 仍有其它订阅地址的频道保留，只移除 s1 的地址
+        assertEquals(listOf("http://s2/cctv2"), byName.getValue("CCTV-2").allUrls())
+        // 只由 s1 提供的频道被删除
+        assertTrue("CCTV-3" !in byName)
+    }
+
+    @Test
+    fun testDeleteSourceRemovesOnlyItsUrls() = runBlocking {
+        repository.addSource(Source(id = "s1", name = "s1", url = "http://s1"))
+        repository.addChannels(
+            listOf(
+                Channel(id = "c1", name = "CCTV-1", url = "http://s1/cctv1", category = "央视"),
+                Channel(id = "c2", name = "CCTV-2", url = "http://s1/cctv2", category = "央视")
+            ),
+            sourceId = "s1"
+        )
+        repository.addChannels(listOf(Channel(id = "m", name = "CCTV-1", url = "http://manual/cctv1", category = "央视")))
+
+        repository.deleteSource("s1")
+
+        assertEquals(listOf("http://manual/cctv1"), fakeChannelDao.channels.single().allUrls())
+        assertTrue(repository.getAllSources().first().isEmpty())
+    }
+
+    @Test
+    fun testMoveChannelOnlyChangesCategory() = runBlocking {
+        repository.addChannels(listOf(Channel(id = "a", name = "A", url = "http://old", category = "c1")), sourceId = "s1")
+        // 界面持有旧快照期间订阅刷新出新地址，移动分类不应覆盖它
+        repository.addChannels(listOf(Channel(id = "x", name = "A", url = "http://new", category = "c1")), sourceId = "s1")
+        repository.moveChannel("a", "c2")
+
+        val a = fakeChannelDao.channels.single()
+        assertEquals("c2", a.category)
+        assertEquals(listOf("http://new"), a.allUrls())
+
+        repository.deleteChannel("a")
+        assertTrue(fakeChannelDao.channels.isEmpty())
+    }
+
+    @Test
+    fun testImportOldBackupWithoutUrlSources() = runBlocking {
+        repository.importData("""{"channels":[{"id":"a","name":"A","url":"http://a","backupUrls":[],"category":"c"}],"sources":[]}""")
+        assertEquals("", fakeChannelDao.channels.single().urlSources)
+    }
+
     private fun seed() {
         fakeChannelDao.seed(
             listOf(
@@ -128,7 +202,7 @@ class ChannelRepositoryTest {
         seed()
         assertEquals(
             listOf(ChannelRepository.FAVORITE_CATEGORY, "央视", "卫视", "地方"),
-            repository.getAllCategoriesWithFavorite().first()
+            ChannelRepository.categoriesOf(repository.getAllChannels().first())
         )
     }
 
@@ -137,7 +211,7 @@ class ChannelRepositoryTest {
         seed()
         repository.mergeCategory("地方", "央视")
         assertEquals(listOf("a1", "a2", "c1"), repository.getChannelsByCategory("央视").first().map { it.id })
-        assertTrue("地方" !in repository.getAllCategoriesWithFavorite().first())
+        assertTrue("地方" !in ChannelRepository.categoriesOf(repository.getAllChannels().first()))
         // 收藏是虚拟分类，不可作为合并源或目标
         repository.mergeCategory(ChannelRepository.FAVORITE_CATEGORY, "地方")
         assertEquals(1, repository.getChannelsByCategory(ChannelRepository.FAVORITE_CATEGORY).first().size)

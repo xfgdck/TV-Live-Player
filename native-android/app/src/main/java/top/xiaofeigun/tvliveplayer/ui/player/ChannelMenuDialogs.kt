@@ -30,20 +30,20 @@ class ChannelMenuDialogs(
         val otherCats = state.allCategories.filter {
             it != ChannelRepository.FAVORITE_CATEGORY && it != curCat
         }
-        val items = arrayOf("移动到其它分类", "合并当前分类", "删除当前频道", "清空当前分类")
+        val items = arrayOf("移动到其它分类", "删除当前频道", "合并当前分类", "清空当前分类")
         AlertDialog.Builder(context)
             .setTitle(channel.name)
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> pickCategory("移动到", otherCats) { target ->
-                        viewModel.moveCategoryChannel(index, target)
+                        viewModel.moveChannel(channel.id, target)
                         toast("已移动到 $target")
                     }
-                    1 -> pickCategory("将「$curCat」合并到", otherCats) { target ->
+                    1 -> viewModel.deleteChannel(channel.id)
+                    2 -> pickCategory("将「$curCat」合并到", otherCats) { target ->
                         viewModel.mergeCategory(curCat, target)
                         toast("已将「$curCat」合并到「$target」")
                     }
-                    2 -> viewModel.deleteCategoryChannel(index)
                     3 -> confirmDeleteCategory(curCat)
                 }
             }

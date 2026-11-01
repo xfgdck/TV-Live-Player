@@ -18,17 +18,17 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.activity.viewModels
 import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
-import top.xiaofeigun.tvliveplayer.domain.repository.ChannelRepository
+import top.xiaofeigun.tvliveplayer.domain.usecase.ImportSubscriptionUseCase
+import top.xiaofeigun.tvliveplayer.domain.usecase.PrepareChannelDataUseCase
+import top.xiaofeigun.tvliveplayer.domain.usecase.SyncChannelBackupUseCase
 import top.xiaofeigun.tvliveplayer.ui.player.Page
 import top.xiaofeigun.tvliveplayer.ui.player.PlayerFragment
 import top.xiaofeigun.tvliveplayer.ui.player.PlayerViewModel
 import top.xiaofeigun.tvliveplayer.ui.settings.SettingsFragment
 import top.xiaofeigun.tvliveplayer.ui.settings.SourceMgmtFragment
 import top.xiaofeigun.tvliveplayer.ui.settings.UpdateFragment
-import top.xiaofeigun.tvliveplayer.util.ChannelBackupHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,9 +36,10 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    @Inject lateinit var channelRepository: ChannelRepository
+    @Inject lateinit var syncChannelBackup: SyncChannelBackupUseCase
+    @Inject lateinit var prepareChannelData: PrepareChannelDataUseCase
+    @Inject lateinit var importSubscription: ImportSubscriptionUseCase
     @Inject lateinit var appPreferences: AppPreferences
-    @Inject lateinit var channelBackupHelper: ChannelBackupHelper
 
     private val playerViewModel: PlayerViewModel by viewModels()
     private val isTouchDevice: Boolean by lazy {
@@ -51,29 +52,20 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hideSystemBars()
 
-        lifecycleScope.launch {
-            if (appPreferences.isFirstLaunch()) {
-                channelRepository.resetToDefaults()
-                appPreferences.setFirstLaunchDone()
-                channelBackupHelper.saveBackup(channelRepository.exportData())
-            } else {
-                // 非首次启动（如应用覆盖更新后），检查数据库自愈恢复
-                val channels = channelRepository.getAllChannels().first()
-                if (channels.isEmpty()) {
-                    val backup = channelBackupHelper.loadBackup()
-                    if (!backup.isNullOrBlank()) {
-                        channelRepository.importData(backup)
-                    }
-                }
-            }
-        }
-
         if (savedInstanceState == null) {
             // 同步提交，确保播放器始终位于 Fragment 层级最底部
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, PlayerFragment(), PLAYER_TAG)
                 .commitNow()
             handleIntent(intent)
+        }
+
+        val autoRefresh = savedInstanceState == null && appPreferences.isAutoRefreshEnabled()
+        lifecycleScope.launch {
+            prepareChannelData()
+            // 开启自动更新时静默刷新过期订阅，频道列表经 Room Flow 自动更新
+            if (autoRefresh) launch { importSubscription.refreshStale() }
+            syncChannelBackup()
         }
 
         // 遥控器返回、手势返回（含 Android 16 预测性返回）统一由此处理
@@ -165,13 +157,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        lifecycleScope.launch {
-            try {
-                val data = channelRepository.exportData()
-                channelBackupHelper.saveBackup(data)
-            } catch (_: Exception) {
-            }
-        }
+        // 退到后台时立即落盘，不等防抖
+        lifecycleScope.launch { syncChannelBackup.saveNow() }
     }
 
     private fun hideSystemBars() {

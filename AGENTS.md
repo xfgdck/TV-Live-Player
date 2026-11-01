@@ -83,10 +83,12 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
 │   │   └── ChannelRepository.kt        # 数据仓储契约
 │   └── usecase/
 │       ├── ParseAndImportM3UUseCase.kt # 解析并入库 UseCase
-│       └── ImportSubscriptionUseCase.kt # 在线订阅导入（保存订阅）与一键刷新
+│       ├── ImportSubscriptionUseCase.kt # 在线订阅导入、单个刷新、启动时静默刷新过期订阅（源管理页开关，默认关闭）
+│       ├── PrepareChannelDataUseCase.kt # 启动数据准备（首次初始化、快照自愈恢复）
+│       └── SyncChannelBackupUseCase.kt # 数据变化后防抖写入快照（防止清空后被旧快照恢复）
 ├── data/
 │   ├── local/
-│   │   ├── AppDatabase.kt              # Room 数据库定义 (version = 2)
+│   │   ├── AppDatabase.kt              # Room 数据库定义 (version = 4，正式 Migration，结构导出至 app/schemas)
 │   │   ├── TransactionRunner.kt        # 事务执行器（清空+写入等多步操作原子提交）
 │   │   ├── dao/ChannelDao.kt           # 频道数据库访问对象
 │   │   ├── dao/SourceDao.kt            # 订阅源访问对象
@@ -108,7 +110,7 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
     │   └── PlayerViewModel.kt          # UI 状态机（navStack、频道换台、分类切换、收藏）
     └── settings/
         ├── SettingsFragment.kt         # 设置中心页面
-        ├── SourceMgmtFragment.kt       # 源管理（扫码导入、URL 解析、清空节目）
+        ├── SourceMgmtFragment.kt       # 源管理（扫码/URL 导入、订阅列表：单个更新/重命名/删除、清空节目）
         ├── QrInputDialogFragment.kt    # 局域网配网二维码弹窗
         └── UpdateFragment.kt           # 软件更新检查页面
 ```
@@ -185,8 +187,8 @@ native-android/app/src/main/java/top/xiaofeigun/tvliveplayer/
   - **取消收藏**：从收藏中移除该频道。
 - **其他自定义分类下**：
   - **移动到其它分类**：弹出分类列表，将该频道归属更改为目标分类。
-  - **合并当前分类**：将当前分类下的全部频道批量移入指定分类，当前分类自动合并消除。
   - **删除当前频道**：从数据库中永久移除当前频道。
+  - **合并当前分类**：将当前分类下的全部频道批量移入指定分类，当前分类自动合并消除。
   - **清空当前分类**：弹出二次确认对话框，确认后删除该分类下全部频道。
 
 ---

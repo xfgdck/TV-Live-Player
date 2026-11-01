@@ -58,9 +58,11 @@ class PlayerFragment : Fragment() {
     private val dismissExitRunnable = Runnable { viewModel.dismissExitConfirm() }
 
     private var lastPlayedChannelId: String? = null
-    private var lastPlayedUrl: String? = null
+    private var lastPlayedUrls: List<String> = emptyList()
     private var redirectingToSourceMgmt = false
     private var userPaused = false
+    /** 退到后台时已停止拉流，回到前台需重新拉流 */
+    private var stoppedInBackground = false
     private var edgeToast: Toast? = null
     private var lastEdgeToastTime = 0L
     private val isTouchDevice: Boolean by lazy {
@@ -156,18 +158,22 @@ class PlayerFragment : Fragment() {
     private fun syncPlayback(state: PlayerUiState) {
         val channel = state.currentChannel
         if (channel != null) {
-            if (channel.id != lastPlayedChannelId || channel.url != lastPlayedUrl) {
+            if (channel.id != lastPlayedChannelId) {
                 lastPlayedChannelId = channel.id
-                lastPlayedUrl = channel.url
+                lastPlayedUrls = channel.allUrls
                 userPaused = false
                 tvError.visibility = View.GONE
                 ivPause.visibility = View.GONE
                 showOsd()
                 tvPlayer.playUrls(channel.allUrls)
+            } else if (channel.allUrls != lastPlayedUrls) {
+                // 刷新订阅等导致地址列表变化：不打断当前播放，新备用源立即可用
+                lastPlayedUrls = channel.allUrls
+                tvPlayer.updateUrls(channel.allUrls)
             }
         } else if (lastPlayedChannelId != null) {
             lastPlayedChannelId = null
-            lastPlayedUrl = null
+            lastPlayedUrls = emptyList()
             userPaused = false
             ivPause.visibility = View.GONE
             osdLayout.visibility = View.GONE
@@ -432,6 +438,22 @@ class PlayerFragment : Fragment() {
         override fun onVerticalSwipe(next: Boolean) {
             if (next) viewModel.nextChannel() else viewModel.previousChannel()
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (stoppedInBackground) {
+            stoppedInBackground = false
+            userPaused = false
+            ivPause.visibility = View.GONE
+            tvPlayer.restart()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stoppedInBackground = true
+        tvPlayer.stop()
     }
 
     override fun onPause() {

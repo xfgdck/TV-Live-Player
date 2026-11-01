@@ -9,6 +9,7 @@ import top.xiaofeigun.tvliveplayer.data.local.dao.SourceDao
 import top.xiaofeigun.tvliveplayer.data.local.entity.ChannelEntity
 import top.xiaofeigun.tvliveplayer.data.local.entity.SourceEntity
 import top.xiaofeigun.tvliveplayer.data.preferences.AppPreferences
+import top.xiaofeigun.tvliveplayer.util.ChannelBackupHelper
 
 /** 响应式内存 ChannelDao：与 Room 一样，数据变更后所有 Flow 重新推送 */
 class FakeChannelDao : ChannelDao {
@@ -25,8 +26,6 @@ class FakeChannelDao : ChannelDao {
         data.map { list -> list.filter { it.category == category }.sortedBy { it.sortOrder } }
     override fun getFavoriteChannels(): Flow<List<ChannelEntity>> =
         data.map { list -> list.filter { it.favorite == 1 }.sortedBy { it.sortOrder } }
-    override fun getCategories(): Flow<List<String>> =
-        data.map { list -> list.sortedBy { it.sortOrder }.map { it.category }.distinct() }
     override suspend fun getChannelById(id: String): ChannelEntity? = data.value.find { it.id == id }
     override suspend fun getAllChannelsList(): List<ChannelEntity> = data.value.sortedBy { it.sortOrder }
     override suspend fun getMaxSortOrder(): Int? = data.value.maxOfOrNull { it.sortOrder }
@@ -34,13 +33,22 @@ class FakeChannelDao : ChannelDao {
         val ids = channels.map { it.id }.toSet()
         data.value = data.value.filter { it.id !in ids } + channels
     }
-    override suspend fun update(channel: ChannelEntity) = updateAll(listOf(channel))
+    override suspend fun updateCategory(id: String, category: String) {
+        data.value = data.value.map { if (it.id == id) it.copy(category = category) else it }
+    }
+    override suspend fun updateFavorite(id: String, favorite: Int) {
+        data.value = data.value.map { if (it.id == id) it.copy(favorite = favorite) else it }
+    }
     override suspend fun updateAll(channels: List<ChannelEntity>) {
         val byId = channels.associateBy { it.id }
         data.value = data.value.map { byId[it.id] ?: it }
     }
-    override suspend fun delete(channel: ChannelEntity) {
-        data.value = data.value.filter { it.id != channel.id }
+    override suspend fun deleteById(id: String) {
+        data.value = data.value.filter { it.id != id }
+    }
+    override suspend fun deleteChannels(channels: List<ChannelEntity>) {
+        val ids = channels.map { it.id }.toSet()
+        data.value = data.value.filter { it.id !in ids }
     }
     override suspend fun deleteAll() {
         data.value = emptyList()
@@ -60,6 +68,9 @@ class FakeSourceDao : SourceDao {
     override suspend fun insert(source: SourceEntity) {
         data.value = data.value.filter { it.id != source.id } + source
     }
+    override suspend fun delete(id: String) {
+        data.value = data.value.filter { it.id != id }
+    }
     override suspend fun deleteAll() {
         data.value = emptyList()
     }
@@ -69,10 +80,15 @@ object ImmediateTransactionRunner : TransactionRunner {
     override suspend fun <T> run(block: suspend () -> T): T = block()
 }
 
-class FakeAppPreferences : AppPreferences(null) {
-    private var lastId: String? = null
+class FakeAppPreferences(lastChannelId: String? = null) : AppPreferences(null) {
+    private var lastId: String? = lastChannelId
     override fun getLastChannelId(): String? = lastId
     override fun setLastChannelId(id: String) { lastId = id }
     override fun isFirstLaunch(): Boolean = false
     override fun setFirstLaunchDone() {}
+}
+
+class FakeChannelBackupHelper(var snapshot: String? = null) : ChannelBackupHelper(null) {
+    override suspend fun saveBackup(json: String) { snapshot = json }
+    override suspend fun loadBackup(): String? = snapshot
 }

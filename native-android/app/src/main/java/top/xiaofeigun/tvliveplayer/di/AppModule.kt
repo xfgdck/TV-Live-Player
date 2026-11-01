@@ -40,7 +40,10 @@ object AppModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            // 仅极早期 v1 与降级安装时重建，数据由 ChannelBackupHelper 快照自愈恢复
+            .fallbackToDestructiveMigrationFrom(true, 1)
+            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()
     }
 

@@ -13,20 +13,20 @@ import javax.inject.Singleton
  * 保障应用在升级、覆盖更新或极端异常情况下，用户频道数据 100% 不丢失
  */
 @Singleton
-class ChannelBackupHelper @Inject constructor(
-    @param:ApplicationContext private val context: Context
+open class ChannelBackupHelper @Inject constructor(
+    @param:ApplicationContext private val context: Context?
 ) {
     companion object {
         private const val BACKUP_DIR_NAME = "backup"
         private const val BACKUP_FILE_NAME = "channels_snapshot.json"
     }
 
-    private val backupFile: File by lazy {
-        val dir = File(context.filesDir, BACKUP_DIR_NAME).apply { mkdirs() }
-        File(dir, BACKUP_FILE_NAME)
+    private val backupFile: File? by lazy {
+        context?.let { File(File(it.filesDir, BACKUP_DIR_NAME).apply { mkdirs() }, BACKUP_FILE_NAME) }
     }
 
-    suspend fun saveBackup(json: String) = withContext(Dispatchers.IO) {
+    open suspend fun saveBackup(json: String) = withContext(Dispatchers.IO) {
+        val backupFile = backupFile ?: return@withContext
         try {
             if (json.isNotBlank()) {
                 val tempFile = File(backupFile.parentFile, "$BACKUP_FILE_NAME.tmp")
@@ -39,7 +39,8 @@ class ChannelBackupHelper @Inject constructor(
         }
     }
 
-    suspend fun loadBackup(): String? = withContext(Dispatchers.IO) {
+    open suspend fun loadBackup(): String? = withContext(Dispatchers.IO) {
+        val backupFile = backupFile ?: return@withContext null
         try {
             if (backupFile.exists() && backupFile.length() > 0) {
                 backupFile.readText(Charsets.UTF_8)
